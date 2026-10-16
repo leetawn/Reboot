@@ -1,0 +1,251 @@
+@page "/"
+@using Reboot.Models
+@using Reboot.Services
+@inject IListingService ListingService
+@inject IOrderService OrderService
+@inject IDisputeService DisputeService
+@inject IUserService UserService
+@inject ICurrentUserService CurrentUserService
+@inject NavigationManager NavigationManager
+
+<PageTitle>@AppConfig.AppName</PageTitle>
+
+<HeadContent>
+    <meta name="description" content="Reboot is a marketplace for used electronics and gaming gear in Metro Cebu. Every listing follows a verified condition checklist, with payment held in escrow until confirmed." />
+</HeadContent>
+
+<div class="space-y-16 py-2">
+    <!-- 1. Opening Section: Plain, left-aligned, compact -->
+    <section class="max-w-3xl space-y-4">
+        <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 leading-tight">
+            Used electronics and gaming gear, with payment held until you've checked it.
+        </h1>
+
+        <p class="text-sm sm:text-base text-zinc-600 max-w-2xl leading-relaxed">
+            Every listing follows a structured condition checklist. Payments are held in escrow for a 48-hour inspection window before funds release to the seller.
+        </p>
+
+        <div class="flex flex-wrap items-center gap-3 pt-2">
+            <a href="/browse" class="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold rounded-md transition-colors">
+                Browse listings
+            </a>
+            <a href="/sell" class="px-5 py-2.5 bg-white border border-zinc-300 hover:border-zinc-900 text-zinc-900 text-xs font-semibold rounded-md transition-colors">
+                Sell an item
+            </a>
+        </div>
+    </section>
+
+    <!-- 2. Live Numbers Row: Plain facts from real in-memory store -->
+    <section>
+        <StatRow Stats="@LiveStats" />
+    </section>
+
+    <!-- 3. How It Works: Three numbered steps -->
+    <section class="space-y-6">
+        <SectionHeading Title="How it works"
+                        Description="Every transaction moves through platform escrow to ensure condition accuracy before funds exchange hands." />
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <StepItem Number="01"
+                      Title="Sellers list with a diagnostic condition checklist"
+                      Description="Sellers run through category-specific tests (boot checks, ports, display, thermals). The grade is computed automatically from checklist results and defect notes, never typed freely." />
+
+            <StepItem Number="02"
+                      Title="Buyers pay and funds are secured in platform escrow"
+                      Description="When a buyer purchases or accepts an offer, the listing reserves for 24 hours. Payment is held in platform escrow before any physical hand-over or courier shipment occurs." />
+
+            <StepItem Number="03"
+                      Title="Buyers inspect for 48 hours before funds release"
+                      Description="The buyer has a 48-hour inspection window to test the hardware against the checklist. Once confirmed, funds release to the seller. If checks fail, an inspection dispute freezes escrow." />
+        </div>
+    </section>
+
+    <!-- 4. Why It Is More Reliable: Two-column layout -->
+    <section class="border border-zinc-200 bg-white rounded-md p-6 sm:p-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div class="lg:col-span-5 space-y-2">
+                <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-zinc-900">
+                    Why Reboot is more reliable than social marketplaces
+                </h2>
+                <p class="text-xs text-zinc-600 leading-relaxed pt-1">
+                    Classified groups and social marketplaces rely on honor systems and subjective claims. Reboot uses deterministic grading rules and escrow locking to enforce honest trade.
+                </p>
+            </div>
+
+            <div class="lg:col-span-7 divide-y divide-zinc-200 border-t border-zinc-200 lg:border-t-0">
+                <div class="py-3.5 first:pt-0 last:pb-0">
+                    <strong class="text-xs font-semibold text-zinc-900 block">Calculated grades instead of seller claims</strong>
+                    <p class="text-xs text-zinc-600 mt-0.5 leading-relaxed font-sans">
+                        Item grades (A, B, C, For Parts) are derived deterministically by platform rules from diagnostic checks and defect keywords, preventing inflated condition claims.
+                    </p>
+                </div>
+
+                <div class="py-3.5 last:pb-0">
+                    <strong class="text-xs font-semibold text-zinc-900 block">Escrow protection on every trade</strong>
+                    <p class="text-xs text-zinc-600 mt-0.5 leading-relaxed font-sans">
+                        Funds never move directly to a seller upfront; platform escrow holds payment until the buyer physically verifies the item against the condition report.
+                    </p>
+                </div>
+
+                <div class="py-3.5 last:pb-0">
+                    <strong class="text-xs font-semibold text-zinc-900 block">Verified seller identities</strong>
+                    <p class="text-xs text-zinc-600 mt-0.5 leading-relaxed font-sans">
+                        Sellers must complete identity verification before listing items, eliminating throwaway accounts and anonymous fraud.
+                    </p>
+                </div>
+
+                <div class="py-3.5 last:pb-0">
+                    <strong class="text-xs font-semibold text-zinc-900 block">Public reliability records</strong>
+                    <p class="text-xs text-zinc-600 mt-0.5 leading-relaxed font-sans">
+                        Plain statistics show completed sales, dispute rates, and response times—with circular wash-trading reviews filtered out.
+                    </p>
+                </div>
+
+                <div class="py-3.5 last:pb-0">
+                    <strong class="text-xs font-semibold text-zinc-900 block">Structured dispute resolution</strong>
+                    <p class="text-xs text-zinc-600 mt-0.5 leading-relaxed font-sans">
+                        Clear administrative procedures for failed diagnostic checks, with prompt outcomes for full refunds, seller release, or partial settlements.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 5. Recent Listings: 6 newest active items -->
+    <section class="space-y-6">
+        <SectionHeading Title="Recent verified listings"
+                        Description="The latest electronics and gaming gear tested and listed by verified local sellers.">
+            <ActionLink>
+                <a href="/browse" class="font-medium text-zinc-900 hover:text-zinc-600 underline underline-offset-4">
+                    View all listings (@_activeListingsCount) →
+                </a>
+            </ActionLink>
+        </SectionHeading>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach (var item in _recentListings)
+            {
+                <ListingCard Listing="item" />
+            }
+        </div>
+    </section>
+
+    <!-- 6. Grade Explainer: Compact table reusing GradeBadge -->
+    <section class="space-y-4">
+        <SectionHeading Title="Standardized grading criteria"
+                        Description="Every grade corresponds to a clear, documented diagnostic rule." />
+
+        <div class="bg-white border border-zinc-200 rounded-md overflow-hidden">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="border-b border-zinc-200 bg-zinc-50/50 text-zinc-500 uppercase text-[10px] tracking-wider font-medium">
+                        <th class="py-2.5 px-4 w-36">Grade</th>
+                        <th class="py-2.5 px-4 w-1/3">Diagnostic Standard</th>
+                        <th class="py-2.5 px-4">Cosmetic &amp; Operational Condition</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100">
+                    <tr class="hover:bg-zinc-50/50 transition-colors">
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <GradeBadge Grade="ItemGrade.A" />
+                        </td>
+                        <td class="py-3 px-4 font-medium text-zinc-900">
+                            100% of checks passed, zero defects
+                        </td>
+                        <td class="py-3 px-4 text-zinc-600">
+                            Like new or mint. No scratches, scuffs, dead pixels, stick drift, or thermal throttling.
+                        </td>
+                    </tr>
+                    <tr class="hover:bg-zinc-50/50 transition-colors">
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <GradeBadge Grade="ItemGrade.B" />
+                        </td>
+                        <td class="py-3 px-4 font-medium text-zinc-900">
+                            Fully functional, minor cosmetic note
+                        </td>
+                        <td class="py-3 px-4 text-zinc-600">
+                            Good condition. All core hardware tests pass. May have hairline surface rubs or finish shine.
+                        </td>
+                    </tr>
+                    <tr class="hover:bg-zinc-50/50 transition-colors">
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <GradeBadge Grade="ItemGrade.C" />
+                        </td>
+                        <td class="py-3 px-4 font-medium text-zinc-900">
+                            Fully functional, noticeable wear
+                        </td>
+                        <td class="py-3 px-4 text-zinc-600">
+                            Fair condition. Device operates reliably. Disclosed wear such as degraded battery, lid scratch, or missing rubber foot.
+                        </td>
+                    </tr>
+                    <tr class="hover:bg-zinc-50/50 transition-colors">
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            <GradeBadge Grade="ItemGrade.ForParts" />
+                        </td>
+                        <td class="py-3 px-4 font-medium text-zinc-900">
+                            Diagnostic failure, repair needed
+                        </td>
+                        <td class="py-3 px-4 text-zinc-600">
+                            Hardware does not boot, failed power checks, or sold strictly as-is for parts, salvage, or repair.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- 7. Closing Call to Action: Only for signed-out or unverified users -->
+    @if (!IsVerifiedSeller)
+    {
+        <section class="border border-zinc-200 bg-white rounded-md p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h3 class="text-base font-bold text-zinc-900">
+                    Sell your used electronics with escrow protection
+                </h3>
+                <p class="text-xs text-zinc-600 mt-0.5">
+                    Have unused consoles, GPUs, handhelds, or accessories? List with structured verification in minutes.
+                </p>
+            </div>
+            <a href="/sell" class="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold rounded-md transition-colors whitespace-nowrap flex-shrink-0">
+                Start selling
+            </a>
+        </section>
+    }
+</div>
+
+@code {
+    private List<Listing> _recentListings = new();
+    private int _activeListingsCount;
+    private List<StatRow.StatItem> LiveStats = new();
+
+    private bool IsVerifiedSeller => CurrentUserService.IsSignedIn && CurrentUserService.IsVerified;
+
+    protected override void OnInitialized()
+    {
+        LoadLandingData();
+    }
+
+    private void LoadLandingData()
+    {
+        var allActiveListings = ListingService.GetListings().ToList();
+        _activeListingsCount = allActiveListings.Count;
+        _recentListings = allActiveListings.Take(6).ToList();
+
+        var completedOrdersCount = OrderService.GetAllOrdersAdmin()
+            .Count(o => o.Status == OrderStatus.Released || o.Status == OrderStatus.Resolved);
+
+        var verifiedSellersCount = UserService.GetAllUsers()
+            .Count(u => u.IsVerified);
+
+        var resolvedDisputesCount = DisputeService.GetAllDisputes()
+            .Count(d => d.Status != DisputeStatus.Open);
+
+        LiveStats = new List<StatRow.StatItem>
+        {
+            new(_activeListingsCount.ToString(), "Active listings"),
+            new(completedOrdersCount.ToString(), "Completed sales"),
+            new(verifiedSellersCount.ToString(), "Verified sellers"),
+            new(resolvedDisputesCount.ToString(), "Disputes resolved")
+        };
+    }
+}

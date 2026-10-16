@@ -1,0 +1,20 @@
+<div class="border border-zinc-200 bg-white p-5 sm:p-6 rounded-sm flex flex-col justify-between space-y-4 @CustomClass">
+    <div class="space-y-3">
+        <span class="font-mono text-2xl font-bold tracking-tight text-zinc-400 block tabular-nums">
+            @Number
+        </span>
+        <h3 class="text-sm font-semibold text-zinc-900 leading-snug">
+            @Title
+        </h3>
+        <p class="text-xs text-zinc-600 leading-relaxed font-sans">
+            @Description
+        </p>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Number { get; set; } = "01";
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Description { get; set; } = string.Empty;
+    [Parameter] public string? CustomClass { get; set; }
+}

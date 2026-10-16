@@ -1,0 +1,63 @@
+@page "/login"
+@attribute [AllowAnonymous]
+
+<PageTitle>Sign in | @AppConfig.AppName</PageTitle>
+
+<AuthCard Title="Sign in"
+          Subtitle="@($"to continue to {AppConfig.AppName}")"
+          ErrorMessage="@Error"
+          SuccessMessage="@(ResetSuccess == "true" ? "Password reset successfully. Please sign in with your new password." : null)">
+    <form method="post" action="/auth/login" class="space-y-4">
+        @if (!string.IsNullOrWhiteSpace(ReturnUrl))
+        {
+            <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+        }
+
+        <FormField Id="email"
+                   Name="email"
+                   Label="Email address"
+                   Type="email"
+                   Required="true"
+                   AutoFocus="true"
+                   Placeholder="name@example.com" />
+
+        <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+                <label for="password" class="block text-xs font-medium text-zinc-700">Password <span class="text-zinc-400">*</span></label>
+                <a href="/forgot-password" class="text-xs text-zinc-600 hover:text-zinc-900 transition-colors">
+                    Forgot password?
+                </a>
+            </div>
+            <input id="password"
+                   name="password"
+                   type="password"
+                   required
+                   class="w-full px-3 py-2 text-sm bg-white border border-[#dadce1] rounded-md transition-colors outline-none focus:border-zinc-900 focus:ring-2 focus:ring-zinc-200 text-zinc-900" />
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+            <input id="showPassword"
+                   type="checkbox"
+                   onchange="document.getElementById('password').type = this.checked ? 'text' : 'password'"
+                   class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900" />
+            <label for="showPassword" class="text-xs text-zinc-600 cursor-pointer select-none">
+                Show password
+            </label>
+        </div>
+
+        <div class="flex items-center justify-between pt-6">
+            <a href="/register" class="text-xs font-medium text-zinc-700 hover:text-zinc-900 transition-colors">
+                Create account
+            </a>
+            <button type="submit" class="px-6 py-2 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-md transition-colors shadow-none">
+                Sign in
+            </button>
+        </div>
+    </form>
+</AuthCard>
+
+@code {
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery] public string? ResetSuccess { get; set; }
+}

@@ -1,0 +1,26 @@
+<div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-zinc-200 pb-3 mb-6 @CustomClass">
+    <div>
+        <h2 class="text-lg font-bold tracking-tight text-zinc-900 sm:text-xl">
+            @Title
+        </h2>
+        @if (!string.IsNullOrWhiteSpace(Description))
+        {
+            <p class="text-xs text-zinc-500 mt-1 max-w-xl">
+                @Description
+            </p>
+        }
+    </div>
+    @if (ActionLink != null)
+    {
+        <div class="text-xs pt-1 sm:pt-0">
+            @ActionLink
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public RenderFragment? ActionLink { get; set; }
+    [Parameter] public string? CustomClass { get; set; }
+}

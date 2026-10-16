@@ -1,0 +1,20 @@
+<div class="grid grid-cols-2 md:grid-cols-4 border-y border-zinc-200 divide-y md:divide-y-0 md:divide-x divide-zinc-200 bg-white @CustomClass">
+    @foreach (var stat in Stats)
+    {
+        <div class="p-4 sm:p-5 flex flex-col justify-center">
+            <span class="font-mono text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 tabular-nums">
+                @stat.Value
+            </span>
+            <span class="font-mono text-[11px] uppercase tracking-wider text-zinc-500 mt-1">
+                @stat.Label
+            </span>
+        </div>
+    }
+</div>
+
+@code {
+    public record StatItem(string Value, string Label);
+
+    [Parameter, EditorRequired] public IReadOnlyList<StatItem> Stats { get; set; } = Array.Empty<StatItem>();
+    [Parameter] public string? CustomClass { get; set; }
+}

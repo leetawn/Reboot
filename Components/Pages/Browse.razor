@@ -1,0 +1,230 @@
+@page "/browse"
+@using Reboot.Models
+@using Reboot.Services
+@inject IListingService ListingService
+@inject IUserService UserService
+
+<PageTitle>Browse | @AppConfig.AppName</PageTitle>
+
+<div class="space-y-6">
+    <!-- Top Editorial Header & One-line Explanation -->
+    <div class="border-b border-zinc-200 pb-5">
+        <h1 class="text-2xl font-bold tracking-tight text-zinc-900">
+            Browse listings
+        </h1>
+        <p class="mt-1 text-sm text-zinc-600">
+            Every listing follows a structured condition checklist. Payments are held in escrow for a 48-hour inspection window before funds release.
+        </p>
+    </div>
+
+    <!-- Category selector row -->
+    <div class="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-zinc-200">
+        <button type="button" @onclick="() => SetCategory(null)" class="px-3 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors @(_filter.Category == null ? "bg-zinc-900 text-white font-medium" : "bg-white text-zinc-700 border border-zinc-200 hover:border-zinc-400")">
+            All Categories
+        </button>
+        @foreach (var cat in Enum.GetValues<ListingCategory>())
+        {
+            var isSelected = _filter.Category == cat;
+            <button type="button" @onclick="() => SetCategory(cat)" class="px-3 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors @(isSelected ? "bg-zinc-900 text-white font-medium" : "bg-white text-zinc-700 border border-zinc-200 hover:border-zinc-400")">
+                @cat.ToString()
+            </button>
+        }
+    </div>
+
+    <!-- Filter toolbar -->
+    <div class="bg-white border border-zinc-200 rounded-md p-4 space-y-3">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <!-- Search bar -->
+            <div class="md:col-span-2 relative">
+                <input type="text"
+                       @bind="_filter.SearchQuery"
+                       @bind:event="oninput"
+                       @bind:after="ApplyFilters"
+                       placeholder="Search title, brand, or specs (e.g. DualSense, OLED, RTX)..."
+                       class="w-full text-xs bg-zinc-50 border border-zinc-200 rounded-md px-3 py-2 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:border-zinc-900 font-sans" />
+            </div>
+
+            <!-- Grade dropdown -->
+            <div>
+                <select @bind="_selectedGradeString" @bind:after="OnGradeChanged" class="w-full text-xs bg-zinc-50 border border-zinc-200 rounded-md px-2.5 py-2 text-zinc-800 focus:outline-none focus:border-zinc-900 font-sans">
+                    <option value="">All Grades</option>
+                    <option value="A">Grade A (Like New / Mint)</option>
+                    <option value="B">Grade B (Good / Minor Wear)</option>
+                    <option value="C">Grade C (Fair / Noticeable Wear)</option>
+                    <option value="ForParts">For Parts / Repair</option>
+                </select>
+            </div>
+
+            <!-- Sort By dropdown -->
+            <div>
+                <select @bind="_filter.SortBy" @bind:after="ApplyFilters" class="w-full text-xs bg-zinc-50 border border-zinc-200 rounded-md px-2.5 py-2 text-zinc-800 focus:outline-none focus:border-zinc-900 font-sans">
+                    <option value="newest">Sort: Newest First</option>
+                    <option value="price_asc">Sort: Price Low → High</option>
+                    <option value="price_desc">Sort: Price High → Low</option>
+                    <option value="grade">Sort: Grade A → For Parts</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Secondary Filters Row: Location, Price range, Checkboxes -->
+        <div class="pt-3 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-y-3 gap-x-6 text-xs">
+            <div class="flex flex-wrap items-center gap-4">
+                <!-- Location -->
+                <div class="flex items-center gap-1.5">
+                    <span class="text-zinc-500 text-xs">Location:</span>
+                    <select @bind="_filter.Location" @bind:after="ApplyFilters" class="bg-zinc-50 border border-zinc-200 rounded-md px-2 py-1 text-xs text-zinc-800 focus:outline-none focus:border-zinc-900">
+                        <option value="All">All Locations</option>
+                        <option value="Cebu City">Cebu City</option>
+                        <option value="Mandaue City">Mandaue City</option>
+                        <option value="Lapu-Lapu City">Lapu-Lapu City</option>
+                        <option value="Talisay City">Talisay City</option>
+                    </select>
+                </div>
+
+                <!-- Price Range -->
+                <div class="flex items-center gap-1.5 text-xs">
+                    <span class="text-zinc-500">Price:</span>
+                    <input type="number" step="500" placeholder="Min ₱" @bind="_filter.MinPrice" @bind:after="ApplyFilters" class="w-20 bg-zinc-50 border border-zinc-200 rounded-md px-1.5 py-1 text-xs text-zinc-900 font-mono" />
+                    <span class="text-zinc-400">–</span>
+                    <input type="number" step="500" placeholder="Max ₱" @bind="_filter.MaxPrice" @bind:after="ApplyFilters" class="w-20 bg-zinc-50 border border-zinc-200 rounded-md px-1.5 py-1 text-xs text-zinc-900 font-mono" />
+                </div>
+
+                <!-- Verified sellers checkbox -->
+                <label class="inline-flex items-center gap-1.5 cursor-pointer text-zinc-700 select-none">
+                    <input type="checkbox" @bind="_filter.VerifiedSellersOnly" @bind:after="ApplyFilters" class="rounded border-zinc-300 text-zinc-900 focus:ring-0" />
+                    <span>Verified sellers only</span>
+                </label>
+
+                <!-- Warranty offered checkbox -->
+                <label class="inline-flex items-center gap-1.5 cursor-pointer text-zinc-700 select-none">
+                    <input type="checkbox" @bind="_filter.WarrantyOfferedOnly" @bind:after="ApplyFilters" class="rounded border-zinc-300 text-zinc-900 focus:ring-0" />
+                    <span>Seller warranty only</span>
+                </label>
+            </div>
+
+            @if (HasActiveFilters)
+            {
+                <button type="button" @onclick="ClearFilters" class="text-xs text-zinc-500 hover:text-zinc-900 underline underline-offset-4">
+                    Clear all filters
+                </button>
+            }
+        </div>
+    </div>
+
+    <!-- Results metadata bar -->
+    <div class="flex items-center justify-between text-xs text-zinc-500">
+        <div>
+            Showing <span class="font-semibold text-zinc-900 font-mono tabular-nums">@_listings.Count</span> active @(_listings.Count == 1 ? "listing" : "listings")
+        </div>
+        @if (_filter.Category.HasValue)
+        {
+            <div class="text-[11px] text-zinc-400">
+                Filtered by @_filter.Category.Value
+            </div>
+        }
+    </div>
+
+    <!-- Listing Grid -->
+    @if (_listings.Count == 0)
+    {
+        <div class="border border-dashed border-zinc-300 rounded-md p-12 text-center bg-white">
+            <h3 class="text-sm font-semibold text-zinc-900">No listings match your selected criteria</h3>
+            <p class="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
+                Try widening your price range, selecting all categories, or clearing active filters.
+            </p>
+            <button type="button" @onclick="ClearFilters" class="mt-4 px-3.5 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-md hover:bg-zinc-800 transition-colors">
+                Reset All Filters
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            @foreach (var item in _listings)
+            {
+                <ListingCard Listing="item" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? Category { get; set; }
+    [SupplyParameterFromQuery] public string? Grade { get; set; }
+
+    private ListingFilterCriteria _filter = new();
+    private List<Listing> _listings = new();
+    private string _selectedGradeString = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        ApplyFilters();
+    }
+
+    protected override void OnParametersSet()
+    {
+        bool changed = false;
+        if (!string.IsNullOrWhiteSpace(Category) && Enum.TryParse<ListingCategory>(Category, true, out var cat))
+        {
+            if (_filter.Category != cat)
+            {
+                _filter.Category = cat;
+                changed = true;
+            }
+        }
+        if (!string.IsNullOrWhiteSpace(Grade) && Enum.TryParse<ItemGrade>(Grade, true, out var gr))
+        {
+            if (_filter.Grade != gr)
+            {
+                _filter.Grade = gr;
+                _selectedGradeString = Grade;
+                changed = true;
+            }
+        }
+        if (changed)
+        {
+            ApplyFilters();
+        }
+    }
+
+    private void SetCategory(ListingCategory? category)
+    {
+        _filter.Category = category;
+        ApplyFilters();
+    }
+
+    private void OnGradeChanged()
+    {
+        if (string.IsNullOrWhiteSpace(_selectedGradeString))
+        {
+            _filter.Grade = null;
+        }
+        else if (Enum.TryParse<ItemGrade>(_selectedGradeString, out var grade))
+        {
+            _filter.Grade = grade;
+        }
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        _listings = ListingService.GetListings(_filter).ToList();
+    }
+
+    private bool HasActiveFilters =>
+        !string.IsNullOrWhiteSpace(_filter.SearchQuery) ||
+        _filter.Category.HasValue ||
+        _filter.Grade.HasValue ||
+        _filter.MinPrice.HasValue ||
+        _filter.MaxPrice.HasValue ||
+        (!string.IsNullOrWhiteSpace(_filter.Location) && _filter.Location != "All") ||
+        _filter.VerifiedSellersOnly ||
+        _filter.WarrantyOfferedOnly;
+
+    private void ClearFilters()
+    {
+        _filter = new ListingFilterCriteria();
+        _selectedGradeString = string.Empty;
+        ApplyFilters();
+    }
+}

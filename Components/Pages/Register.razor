@@ -1,0 +1,124 @@
+@page "/register"
+@attribute [AllowAnonymous]
+
+<PageTitle>Create an account | @AppConfig.AppName</PageTitle>
+
+<AuthCard Title="@($"Create your {AppConfig.AppName} account")"
+          Subtitle="to buy, sell, and verify electronics"
+          WidthClass="max-w-[480px]"
+          ErrorMessage="@Error">
+    <form method="post" action="/auth/register" class="space-y-4">
+        <!-- First and Last Name row -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FormField Id="firstName"
+                       Name="firstName"
+                       Label="First name"
+                       Type="text"
+                       Required="true"
+                       AutoFocus="true"
+                       Placeholder="First name" />
+
+            <FormField Id="lastName"
+                       Name="lastName"
+                       Label="Last name"
+                       Type="text"
+                       Required="true"
+                       Placeholder="Last name" />
+        </div>
+
+        <!-- Email address -->
+        <FormField Id="email"
+                   Name="email"
+                   Label="Email address"
+                   Type="email"
+                   Required="true"
+                   Placeholder="name@example.com" />
+
+        <!-- Metro Cebu City / Municipality -->
+        <div class="space-y-1.5">
+            <label for="city" class="block text-xs font-medium text-zinc-700">
+                City / Municipality <span class="text-zinc-400">*</span>
+            </label>
+            <select id="city"
+                    name="city"
+                    required
+                    class="w-full px-3 py-2 text-sm bg-white border border-[#dadce0] rounded-md transition-colors outline-none focus:border-zinc-900 focus:ring-2 focus:ring-zinc-200 text-zinc-900">
+                <option value="Cebu City">Cebu City</option>
+                <option value="Mandaue City">Mandaue City</option>
+                <option value="Lapu-Lapu City">Lapu-Lapu City</option>
+                <option value="Talisay City">Talisay City</option>
+                <option value="Minglanilla">Minglanilla</option>
+                <option value="Consolacion">Consolacion</option>
+                <option value="Liloan">Liloan</option>
+            </select>
+        </div>
+
+        <!-- Password and Confirm Password -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="space-y-1.5">
+                <label for="regPassword" class="block text-xs font-medium text-zinc-700">
+                    Password <span class="text-zinc-400">*</span>
+                </label>
+                <input id="regPassword"
+                       name="password"
+                       type="password"
+                       required
+                       class="w-full px-3 py-2 text-sm bg-white border border-[#dadce0] rounded-md transition-colors outline-none focus:border-zinc-900 focus:ring-2 focus:ring-zinc-200 text-zinc-900" />
+            </div>
+
+            <div class="space-y-1.5">
+                <label for="confirmPassword" class="block text-xs font-medium text-zinc-700">
+                    Confirm password <span class="text-zinc-400">*</span>
+                </label>
+                <input id="confirmPassword"
+                       name="confirmPassword"
+                       type="password"
+                       required
+                       class="w-full px-3 py-2 text-sm bg-white border border-[#dadce0] rounded-md transition-colors outline-none focus:border-zinc-900 focus:ring-2 focus:ring-zinc-200 text-zinc-900" />
+            </div>
+        </div>
+
+        <p class="text-[11px] text-zinc-500">
+            Use 8 or more characters with a mix of letters and numbers.
+        </p>
+
+        <!-- Show password toggle -->
+        <div class="flex items-center gap-2 pt-1">
+            <input id="showRegPassword"
+                   type="checkbox"
+                   onchange="const t = this.checked ? 'text' : 'password'; document.getElementById('regPassword').type = t; document.getElementById('confirmPassword').type = t;"
+                   class="rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900" />
+            <label for="showRegPassword" class="text-xs text-zinc-600 cursor-pointer select-none">
+                Show password
+            </label>
+        </div>
+
+        <!-- Terms and Privacy checkbox -->
+        <div class="pt-2">
+            <label class="flex items-start gap-2.5 cursor-pointer">
+                <input id="termsAccepted"
+                       name="termsAccepted"
+                       type="checkbox"
+                       required
+                       class="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900" />
+                <span class="text-xs text-zinc-600 leading-relaxed">
+                    I agree to the <a href="/terms" target="_blank" class="text-zinc-900 underline hover:text-zinc-700">Terms of Service</a> and <a href="/privacy" target="_blank" class="text-zinc-900 underline hover:text-zinc-700">Privacy Policy</a>.
+                </span>
+            </label>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-between pt-6">
+            <a href="/login" class="text-xs font-medium text-zinc-700 hover:text-zinc-900 transition-colors">
+                Sign in instead
+            </a>
+            <button type="submit" class="px-6 py-2 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-md transition-colors shadow-none">
+                Create account
+            </button>
+        </div>
+    </form>
+</AuthCard>
+
+@code {
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+}

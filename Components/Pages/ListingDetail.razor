@@ -1,0 +1,411 @@
+@page "/listing/{Id:guid}"
+@using Reboot.Models
+@using Reboot.Services
+@inject IListingService ListingService
+@inject IOrderService OrderService
+@inject IOfferService OfferService
+@inject IUserService UserService
+@inject ICurrentUserService CurrentUserService
+@inject NavigationManager NavigationManager
+
+<PageTitle>@(_listing?.Title ?? "Listing Details") | @AppConfig.AppName</PageTitle>
+
+@if (_listing == null)
+{
+    <div class="border border-zinc-200 rounded-sm p-12 text-center bg-white max-w-lg mx-auto my-12">
+        <h2 class="text-base font-semibold text-zinc-900">Listing Not Found</h2>
+        <p class="text-xs text-zinc-500 mt-1">This item may have been removed or does not exist.</p>
+        <a href="/browse" class="mt-4 inline-block px-4 py-2 bg-zinc-900 text-white text-xs font-medium rounded-sm">Return to Browse</a>
+    </div>
+}
+else
+{
+    <!-- Breadcrumb -->
+    <nav class="flex items-center gap-1.5 text-xs text-zinc-500 font-mono mb-4">
+        <a href="/browse" class="hover:text-zinc-900">Browse</a>
+        <span>/</span>
+        <a href="/browse?category=@_listing.Category" class="hover:text-zinc-900">@_listing.Category.ToString()</a>
+        <span>/</span>
+        <span class="text-zinc-900 truncate max-w-xs">@_listing.Title</span>
+    </nav>
+
+    <!-- Feedback Message -->
+    @if (!string.IsNullOrWhiteSpace(_feedbackMessage))
+    {
+        <div class="mb-4 p-3 rounded-sm border text-xs font-mono flex items-center justify-between @(_isError ? "bg-red-50 text-red-900 border-red-200" : "bg-zinc-100 text-zinc-900 border-zinc-300")">
+            <span>@_feedbackMessage</span>
+            <button type="button" @onclick="() => _feedbackMessage = null" class="text-xs font-bold px-1">✕</button>
+        </div>
+    }
+
+    <!-- Status Notice if not Active -->
+    @if (_listing.Status == ListingStatus.Reserved)
+    {
+        <div class="mb-6 p-4 rounded-sm border border-amber-300 bg-amber-50 text-amber-900 text-xs">
+            <div class="font-mono font-bold uppercase tracking-wider mb-0.5">Item Currently Reserved</div>
+            <p>
+                A buyer has initiated an escrow order. The listing is held for 24 hours. If payment is not completed within that window, the listing returns to Active automatically.
+            </p>
+        </div>
+    }
+    else if (_listing.Status == ListingStatus.Sold)
+    {
+        <div class="mb-6 p-4 rounded-sm border border-zinc-300 bg-zinc-100 text-zinc-800 text-xs font-mono">
+            <strong>Sold:</strong> This item has been inspected and confirmed by the buyer. Escrow payout completed.
+        </div>
+    }
+    else if (_listing.Status == ListingStatus.Removed)
+    {
+        <div class="mb-6 p-4 rounded-sm border border-zinc-300 bg-zinc-100 text-zinc-600 text-xs font-mono">
+            This listing was removed from the marketplace.
+        </div>
+    }
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Left 7 columns: Visuals, Condition Checklist, Specs, Description -->
+        <div class="lg:col-span-7 space-y-6">
+            <!-- Visual Hero Slot -->
+            <div class="relative bg-zinc-100 aspect-[16/10] w-full rounded-sm border border-zinc-200 flex flex-col items-center justify-center p-6">
+                <div class="absolute top-4 left-4">
+                    <GradeBadge Grade="@_listing.Grade" ShowDescription="true" />
+                </div>
+
+                <div class="flex flex-col items-center justify-center text-zinc-400">
+                    <span class="font-mono text-4xl font-bold tracking-widest uppercase">
+                        @_listing.Category.ToString()[..Math.Min(4, _listing.Category.ToString().Length)].ToUpperInvariant()
+                    </span>
+                    <span class="font-mono text-xs uppercase tracking-wider text-zinc-400 mt-2">
+                        @_listing.Brand Hardware Verification
+                    </span>
+                </div>
+
+                <div class="absolute bottom-4 right-4 flex items-center gap-2">
+                    @if (!string.IsNullOrWhiteSpace(_listing.SerialNumber))
+                    {
+                        <span class="font-mono text-[11px] text-zinc-500 bg-white/90 border border-zinc-200 px-2 py-0.5 rounded-sm tabular-nums">
+                            SN: @_listing.SerialNumber
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div class="bg-white border border-zinc-200 rounded-sm p-5">
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-900 font-mono mb-2">Seller Notes &amp; Item Context</h3>
+                <p class="text-sm text-zinc-800 leading-relaxed whitespace-pre-line">
+                    @_listing.Description
+                </p>
+            </div>
+
+            <!-- Full Condition Report Table -->
+            <div>
+                <ConditionReportTable Report="@_listing.ConditionReport" />
+            </div>
+
+            <!-- Specs & Hardware Details Table -->
+            <div class="bg-white border border-zinc-200 rounded-sm p-4">
+                <h4 class="text-xs font-semibold uppercase tracking-wider text-zinc-900 font-mono mb-3">Item Specifications</h4>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-3 gap-x-4 text-xs">
+                    <div>
+                        <span class="font-mono text-[11px] text-zinc-400 block uppercase">Brand</span>
+                        <span class="font-medium text-zinc-800">@_listing.Brand</span>
+                    </div>
+                    <div>
+                        <span class="font-mono text-[11px] text-zinc-400 block uppercase">Category</span>
+                        <span class="font-medium text-zinc-800">@_listing.Category.ToString()</span>
+                    </div>
+                    <div>
+                        <span class="font-mono text-[11px] text-zinc-400 block uppercase">Delivery</span>
+                        <span class="font-medium text-zinc-800">
+                            @(_listing.MeetupOrShipping == DeliveryOption.Both ? "Meetup or Shipping" : _listing.MeetupOrShipping.ToString())
+                        </span>
+                    </div>
+                    <div>
+                        <span class="font-mono text-[11px] text-zinc-400 block uppercase">Personal Warranty</span>
+                        <span class="font-medium text-zinc-800">
+                            @(_listing.WarrantyOffered.HasValue && _listing.WarrantyOffered > 0 ? $"{_listing.WarrantyOffered.Value} Days Guarantee" : "None (Escrow 48h only)")
+                        </span>
+                    </div>
+                    <div>
+                        <span class="font-mono text-[11px] text-zinc-400 block uppercase">Listed On</span>
+                        <span class="font-medium text-zinc-800 font-mono tabular-nums">@_listing.CreatedDate.ToString("MMM dd, yyyy")</span>
+                    </div>
+                    <div>
+                        <span class="font-mono text-[11px] text-zinc-400 block uppercase">Location</span>
+                        <span class="font-medium text-zinc-800">@(Seller?.Location ?? "Cebu")</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right 5 columns: Pricing, Escrow, Actions, Seller Card -->
+        <div class="lg:col-span-5 space-y-6">
+            <!-- Purchase / Order Card -->
+            <div class="bg-white border border-zinc-200 rounded-sm p-5 space-y-5">
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-zinc-900">
+                        @_listing.Title
+                    </h1>
+                    <div class="mt-3 flex items-baseline justify-between border-b border-zinc-100 pb-3">
+                        <PriceTag Amount="@_listing.Price" AmountClass="text-2xl font-bold" SymbolClass="text-sm" />
+                        <span class="font-mono text-xs text-zinc-500">
+                            Listed Price
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Escrow Explainer Callout -->
+                <div class="bg-zinc-50 border border-zinc-200 rounded-sm p-3.5 space-y-2 text-xs">
+                    <div class="flex items-center gap-2 font-mono font-semibold text-zinc-900 uppercase text-[11px] tracking-wider">
+                        <svg class="w-4 h-4 stroke-zinc-900" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        <span>Reboot Escrow Protection</span>
+                    </div>
+                    <p class="text-zinc-600 leading-relaxed">
+                        Payment is held by the platform. You have <strong>48 hours to inspect</strong> the item against the condition checklist before funds release to the seller.
+                    </p>
+                </div>
+
+                <!-- Actions -->
+                @if (IsCurrentSeller)
+                {
+                    <div class="space-y-2 pt-2 border-t border-zinc-100">
+                        <div class="font-mono text-xs text-zinc-500 mb-2">You are the seller of this listing.</div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" @onclick="() => _isEditing = true" class="flex-1 py-2 px-3 bg-white border border-zinc-300 hover:border-zinc-500 text-xs font-medium text-zinc-800 rounded-sm transition-colors">
+                                Edit Listing
+                            </button>
+                            <button type="button" @onclick="HandleRemoveListing" class="py-2 px-3 bg-white border border-red-200 hover:bg-red-50 text-xs font-medium text-red-700 rounded-sm transition-colors">
+                                Remove Listing
+                            </button>
+                        </div>
+                    </div>
+                }
+                else if (_listing.Status == ListingStatus.Active)
+                {
+                    <div class="space-y-3 pt-2">
+                        <!-- Delivery selection for buy now -->
+                        <div class="space-y-1.5">
+                            <span class="font-mono text-[11px] uppercase tracking-wider text-zinc-500 block">Choose Delivery Method:</span>
+                            <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                                @if (_listing.MeetupOrShipping == DeliveryOption.Both || _listing.MeetupOrShipping == DeliveryOption.Meetup)
+                                {
+                                    <button type="button"
+                                            @onclick="() => _selectedDeliveryMethod = DeliveryMethod.Meetup"
+                                            class="p-2 border rounded-sm text-left transition-colors @(_selectedDeliveryMethod == DeliveryMethod.Meetup ? "border-zinc-900 bg-zinc-900 text-white font-semibold" : "border-zinc-200 bg-zinc-50 text-zinc-800")">
+                                        <div>Meetup in Cebu</div>
+                                        <div class="text-[10px] opacity-75">IT Park / Ayala / SM</div>
+                                    </button>
+                                }
+                                @if (_listing.MeetupOrShipping == DeliveryOption.Both || _listing.MeetupOrShipping == DeliveryOption.Shipping)
+                                {
+                                    <button type="button"
+                                            @onclick="() => _selectedDeliveryMethod = DeliveryMethod.Shipping"
+                                            class="p-2 border rounded-sm text-left transition-colors @(_selectedDeliveryMethod == DeliveryMethod.Shipping ? "border-zinc-900 bg-zinc-900 text-white font-semibold" : "border-zinc-200 bg-zinc-50 text-zinc-800")">
+                                        <div>Courier Shipping</div>
+                                        <div class="text-[10px] opacity-75">LBC / Grab / Maxim</div>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Buy Now Button -->
+                        <button type="button" @onclick="HandleBuyNow" class="w-full py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold rounded-sm transition-colors flex items-center justify-center gap-2">
+                            <span>Buy Now &amp; Reserve (24h)</span>
+                            <span class="font-mono tabular-nums opacity-90">@AppConfig.FormatPrice(_listing.Price)</span>
+                        </button>
+
+                        <!-- Make an Offer button if allowed -->
+                        @if (_listing.AllowsOffers)
+                        {
+                            <button type="button" @onclick="() => _showOfferModal = true" class="w-full py-2 px-4 bg-white border border-zinc-300 hover:border-zinc-900 text-zinc-900 text-xs font-medium rounded-sm transition-colors">
+                                Make an Offer (Min. @AppConfig.FormatPrice(_listing.MinimumOffer!.Value))
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Seller Reliability Card -->
+            @if (Seller != null)
+            {
+                <div>
+                    <h3 class="text-xs font-semibold text-zinc-900 mb-2">Seller Reliability Record</h3>
+                    <SellerCard Seller="Seller" />
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Inline Edit Modal/Dialog if seller clicks Edit -->
+    @if (_isEditing)
+    {
+        <div class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <div class="bg-white border border-zinc-200 rounded-sm max-w-lg w-full p-6 space-y-4">
+                <div class="flex items-center justify-between border-b border-zinc-200 pb-3">
+                    <h3 class="text-sm font-semibold text-zinc-900">Edit Listing Information</h3>
+                    <button type="button" @onclick="() => _isEditing = false" class="text-zinc-400 hover:text-zinc-700">✕</button>
+                </div>
+
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="font-mono text-zinc-600 block mb-1">Title</label>
+                        <input type="text" @bind="_listing.Title" class="w-full bg-zinc-50 border border-zinc-200 rounded-sm p-2 text-zinc-900" />
+                    </div>
+                    <div>
+                        <label class="font-mono text-zinc-600 block mb-1">Price (₱)</label>
+                        <input type="number" @bind="_listing.Price" class="w-full bg-zinc-50 border border-zinc-200 rounded-sm p-2 text-zinc-900" />
+                    </div>
+                    <div>
+                        <label class="font-mono text-zinc-600 block mb-1">Minimum Offer (₱)</label>
+                        <input type="number" @bind="_listing.MinimumOffer" class="w-full bg-zinc-50 border border-zinc-200 rounded-sm p-2 text-zinc-900" />
+                    </div>
+                    <div>
+                        <label class="font-mono text-zinc-600 block mb-1">Description</label>
+                        <textarea rows="3" @bind="_listing.Description" class="w-full bg-zinc-50 border border-zinc-200 rounded-sm p-2 text-zinc-900"></textarea>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-200">
+                    <button type="button" @onclick="() => _isEditing = false" class="px-3 py-1.5 border border-zinc-200 text-xs rounded-sm">Cancel</button>
+                    <button type="button" @onclick="SaveEditedListing" class="px-3 py-1.5 bg-zinc-900 text-white text-xs rounded-sm">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Make an Offer Modal -->
+    @if (_showOfferModal)
+    {
+        <div class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <div class="bg-white border border-zinc-200 rounded-sm max-w-sm w-full p-5 space-y-4">
+                <div class="flex items-center justify-between border-b border-zinc-200 pb-2">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider font-mono text-zinc-900">Make an Offer</h3>
+                    <button type="button" @onclick="() => _showOfferModal = false" class="text-zinc-400 hover:text-zinc-700">✕</button>
+                </div>
+
+                <p class="text-xs text-zinc-600">
+                    Offers below @AppConfig.FormatPrice(_listing.MinimumOffer!.Value) will not be accepted. The seller has 24 hours to review.
+                </p>
+
+                <div>
+                    <label class="font-mono text-[11px] uppercase tracking-wider text-zinc-500 block mb-1">Your Offer (₱)</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2 text-zinc-400 font-mono text-xs">₱</span>
+                        <input type="number" step="100" @bind="_offerAmount" class="w-full bg-zinc-50 border border-zinc-300 rounded-sm pl-7 pr-3 py-1.5 text-xs font-mono tabular-nums text-zinc-900 focus:outline-none focus:border-zinc-900" />
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
+                    <button type="button" @onclick="() => _showOfferModal = false" class="px-3 py-1.5 border border-zinc-200 text-xs rounded-sm">Cancel</button>
+                    <button type="button" @onclick="SubmitOffer" class="px-3 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-sm">Submit Offer</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Listing? _listing;
+    private User? Seller => _listing != null ? UserService.GetUserById(_listing.SellerId) : null;
+    private DeliveryMethod _selectedDeliveryMethod = DeliveryMethod.Meetup;
+    private bool _showOfferModal = false;
+    private decimal _offerAmount;
+    private string? _feedbackMessage;
+    private bool _isError;
+    private bool _isEditing = false;
+
+    private bool IsCurrentSeller => CurrentUserService.IsSignedIn && _listing != null && _listing.SellerId == CurrentUserService.UserId;
+
+    protected override void OnInitialized()
+    {
+        LoadListing();
+    }
+
+    protected override void OnParametersSet()
+    {
+        LoadListing();
+    }
+
+    private void LoadListing()
+    {
+        _listing = ListingService.GetListingById(Id);
+        if (_listing != null)
+        {
+            if (_listing.MinimumOffer.HasValue)
+            {
+                _offerAmount = _listing.MinimumOffer.Value;
+            }
+            if (_listing.MeetupOrShipping == DeliveryOption.Shipping)
+            {
+                _selectedDeliveryMethod = DeliveryMethod.Shipping;
+            }
+        }
+    }
+
+    private void HandleBuyNow()
+    {
+        if (!CurrentUserService.IsSignedIn)
+        {
+            NavigationManager.NavigateTo($"/login?returnUrl=/listing/{_listing!.Id}");
+            return;
+        }
+
+        var result = OrderService.CreateOrderReservation(_listing!.Id, CurrentUserService.UserId, _selectedDeliveryMethod);
+        if (result.Success && result.Order != null)
+        {
+            NavigationManager.NavigateTo("/my/orders");
+        }
+        else
+        {
+            _isError = true;
+            _feedbackMessage = result.Message;
+        }
+    }
+
+    private void SubmitOffer()
+    {
+        if (!CurrentUserService.IsSignedIn)
+        {
+            NavigationManager.NavigateTo($"/login?returnUrl=/listing/{_listing!.Id}");
+            return;
+        }
+
+        var result = OfferService.CreateOffer(_listing!.Id, CurrentUserService.UserId, _offerAmount);
+        _showOfferModal = false;
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+    }
+
+    private void SaveEditedListing()
+    {
+        if (_listing != null)
+        {
+            ListingService.UpdateListing(_listing);
+            _isEditing = false;
+            _isError = false;
+            _feedbackMessage = "Listing updated successfully.";
+        }
+    }
+
+    private void HandleRemoveListing()
+    {
+        if (_listing != null && CurrentUserService.IsSignedIn)
+        {
+            var success = ListingService.RemoveListing(_listing.Id, CurrentUserService.UserId);
+            if (success)
+            {
+                NavigationManager.NavigateTo("/my/listings");
+            }
+            else
+            {
+                _isError = true;
+                _feedbackMessage = "Unable to remove listing.";
+            }
+        }
+    }
+}

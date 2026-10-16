@@ -1,0 +1,174 @@
+@page "/seller/{Id}"
+@using Reboot.Models
+@using Reboot.Services
+@inject IUserService UserService
+@inject IListingService ListingService
+@inject IReputationService ReputationService
+
+<PageTitle>@(Seller?.DisplayName ?? "Seller") | @AppConfig.AppName</PageTitle>
+
+@if (Seller == null)
+{
+    <div class="border border-zinc-200 rounded-sm p-12 text-center bg-white max-w-lg mx-auto my-12">
+        <h2 class="text-base font-semibold text-zinc-900 font-mono">User Not Found</h2>
+        <p class="text-xs text-zinc-500 mt-1">This seller account does not exist.</p>
+        <a href="/browse" class="mt-4 inline-block px-4 py-2 bg-zinc-900 text-white text-xs font-medium rounded-sm">Return to Browse</a>
+    </div>
+}
+else
+{
+    var record = ReputationService.GetSellerRecord(Seller.Id);
+    var reviews = ReputationService.GetValidReviewsForSeller(Seller.Id);
+    var activeListings = ListingService.GetListingsBySeller(Seller.Id).Where(l => l.Status == ListingStatus.Active).ToList();
+
+    <div class="space-y-8">
+        <!-- Seller Identity Header -->
+        <div class="bg-white border border-zinc-200 rounded-sm p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="w-14 h-14 rounded-sm bg-zinc-100 border border-zinc-200 flex items-center justify-center font-mono text-xl font-bold text-zinc-800">
+                        @Seller.AvatarInitial
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-xl font-bold text-zinc-900">@Seller.DisplayName</h1>
+                            @if (Seller.IsVerified)
+                            {
+                                <span class="inline-flex items-center gap-1 font-mono text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-sm">
+                                    <svg class="w-3.5 h-3.5 stroke-emerald-700" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                    </svg>
+                                    <span>Verified Identity</span>
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="font-mono text-xs text-zinc-500 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-sm">
+                                    Unverified Account
+                                </span>
+                            }
+                        </div>
+                        <div class="text-xs text-zinc-500 mt-1 flex items-center gap-2">
+                            <span>@Seller.Location, member since @Seller.JoinedDate.ToString("MMM yyyy")</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="font-mono text-xs text-zinc-500 sm:text-right">
+                    <div>Replies @record.AverageResponseTime</div>
+                    <div class="text-[11px] text-zinc-400">Escrow backed seller</div>
+                </div>
+            </div>
+
+            <!-- Plain Facts Reliability Summary -->
+            <div class="mt-6 pt-5 border-t border-zinc-100">
+                <span class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 block mb-1">Seller Reliability Record</span>
+                <p class="font-mono text-sm font-semibold text-zinc-800">
+                    @record.FormattedSummary
+                </p>
+
+                <!-- Detailed Breakdown Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-xs font-mono">
+                    <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-sm">
+                        <span class="text-zinc-400 text-[10px] uppercase block">Completed Sales</span>
+                        <span class="text-base font-bold text-zinc-900 tabular-nums">@record.CompletedSalesCount</span>
+                    </div>
+                    <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-sm">
+                        <span class="text-zinc-400 text-[10px] uppercase block">Inspection Disputes</span>
+                        <span class="text-base font-bold text-zinc-900 tabular-nums">@record.DisputeCount</span>
+                        <span class="text-[10px] text-zinc-400 ml-1">(@record.DisputeRatePercent%)</span>
+                    </div>
+                    <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-sm">
+                        <span class="text-zinc-400 text-[10px] uppercase block">Weighted Rating</span>
+                        <span class="text-base font-bold text-zinc-900 tabular-nums">
+                            @(record.AverageRating.HasValue ? $"{record.AverageRating.Value:F1} / 5.0" : "—")
+                        </span>
+                    </div>
+                    <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-sm">
+                        <span class="text-zinc-400 text-[10px] uppercase block">Verified Reviews</span>
+                        <span class="text-base font-bold text-zinc-900 tabular-nums">@record.ReviewCount</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 1: Active Listings by this seller -->
+        <div class="space-y-4">
+            <div class="flex items-baseline justify-between border-b border-zinc-200 pb-2">
+                <h2 class="text-sm font-semibold uppercase tracking-wider font-mono text-zinc-900">
+                    Active Listings (@activeListings.Count)
+                </h2>
+                <span class="font-mono text-xs text-zinc-400">Available in @Seller.Location</span>
+            </div>
+
+            @if (activeListings.Count == 0)
+            {
+                <div class="bg-white border border-dashed border-zinc-300 rounded-sm p-8 text-center text-xs text-zinc-500 font-mono">
+                    This seller has no active listings currently.
+                </div>
+            }
+            else
+            {
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    @foreach (var listing in activeListings)
+                    {
+                        <ListingCard Listing="listing" />
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Section 2: Verified Transaction Reviews -->
+        <div class="space-y-4">
+            <div class="flex items-baseline justify-between border-b border-zinc-200 pb-2">
+                <h2 class="text-sm font-semibold uppercase tracking-wider font-mono text-zinc-900">
+                    Verified Transaction Reviews (@reviews.Count)
+                </h2>
+                <span class="font-mono text-xs text-zinc-400">Escrow confirmed trades only</span>
+            </div>
+
+            @if (reviews.Count == 0)
+            {
+                <div class="bg-white border border-dashed border-zinc-300 rounded-sm p-8 text-center text-xs text-zinc-500 font-mono">
+                    No reviews recorded yet for this account.
+                </div>
+            }
+            else
+            {
+                <div class="space-y-3">
+                    @foreach (var review in reviews)
+                    {
+                        var reviewer = UserService.GetUserById(review.ReviewerId);
+
+                        <div class="bg-white border border-zinc-200 rounded-sm p-4 text-xs space-y-2">
+                            <div class="flex items-center justify-between font-mono">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-semibold text-zinc-900">@(reviewer?.DisplayName ?? "Buyer")</span>
+                                    <div class="flex items-center text-zinc-900 ml-1">
+                                        @for (int s = 1; s <= review.Rating; s++)
+                                        {
+                                            <span>★</span>
+                                        }
+                                        <span class="text-[10px] text-zinc-500 font-mono ml-1">(@review.Rating / 5)</span>
+                                    </div>
+                                </div>
+                                <span class="text-[11px] text-zinc-400 tabular-nums">
+                                    @review.CreatedDate.ToString("yyyy-MM-dd")
+                                </span>
+                            </div>
+                            <p class="text-zinc-800 leading-relaxed font-sans">
+                                "@review.Comment"
+                            </p>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = string.Empty;
+
+    private User? Seller => UserService.GetUserById(Id);
+}

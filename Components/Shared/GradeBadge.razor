@@ -1,0 +1,46 @@
+@using Reboot.Models
+
+<span class="inline-flex items-center gap-1.5 @ContainerClass">
+    <span class="inline-flex items-center justify-center font-mono text-[11px] font-semibold tracking-wider uppercase px-2 py-0.5 @BadgeClass">
+        @BadgeText
+    </span>
+    @if (ShowDescription)
+    {
+        <span class="text-xs text-zinc-500 font-normal">
+            @DescriptionText
+        </span>
+    }
+</span>
+
+@code {
+    [Parameter] public ItemGrade Grade { get; set; }
+    [Parameter] public bool ShowDescription { get; set; } = false;
+    [Parameter] public string? ContainerClass { get; set; }
+
+    private string BadgeText => Grade switch
+    {
+        ItemGrade.A => "Grade A",
+        ItemGrade.B => "Grade B",
+        ItemGrade.C => "Grade C",
+        ItemGrade.ForParts => "For Parts",
+        _ => Grade.ToString()
+    };
+
+    private string BadgeClass => Grade switch
+    {
+        ItemGrade.A => "bg-zinc-900 text-white rounded-sm",
+        ItemGrade.B => "bg-zinc-100 text-zinc-900 border border-zinc-300 rounded-sm",
+        ItemGrade.C => "bg-amber-50 text-amber-900 border border-amber-300 rounded-sm",
+        ItemGrade.ForParts => "bg-zinc-200 text-zinc-700 border border-zinc-300 rounded-sm line-through decoration-zinc-500",
+        _ => "bg-zinc-100 text-zinc-800 border border-zinc-200 rounded-sm"
+    };
+
+    private string DescriptionText => Grade switch
+    {
+        ItemGrade.A => "Like new, all checks passed, no defects",
+        ItemGrade.B => "Good, minor cosmetic wear, fully functional",
+        ItemGrade.C => "Fair, noticeable wear or minor blemish, functional",
+        ItemGrade.ForParts => "Needs repair, does not function normally, as-is",
+        _ => string.Empty
+    };
+}

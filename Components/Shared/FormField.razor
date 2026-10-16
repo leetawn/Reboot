@@ -1,0 +1,53 @@
+<div class="space-y-1.5 @CustomClass">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <label for="@Id" class="block text-xs font-medium text-zinc-700">
+            @Label @if (Required) { <span class="text-zinc-400">*</span> }
+        </label>
+    }
+
+    @if (CustomInput != null)
+    {
+        @CustomInput
+    }
+    else
+    {
+        <input id="@Id"
+               name="@Name"
+               type="@Type"
+               value="@Value"
+               placeholder="@Placeholder"
+               required="@Required"
+               autofocus="@AutoFocus"
+               class="w-full px-3 py-2 text-sm bg-white border @(!string.IsNullOrWhiteSpace(Error) ? "border-red-500 focus:border-red-500 focus:ring-red-200" : "border-[#dadce0] focus:border-zinc-900 focus:ring-zinc-200") rounded-md transition-colors outline-none focus:ring-2 text-zinc-900" />
+    }
+
+    @if (!string.IsNullOrWhiteSpace(HelperText) && string.IsNullOrWhiteSpace(Error))
+    {
+        <p class="text-[11px] text-zinc-500">
+            @HelperText
+        </p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <p class="text-[11px] text-red-600" aria-live="polite">
+            @Error
+        </p>
+    }
+</div>
+
+@code {
+    [Parameter] public string Id { get; set; } = string.Empty;
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string Type { get; set; } = "text";
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public bool AutoFocus { get; set; }
+    [Parameter] public string? HelperText { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public string? CustomClass { get; set; }
+    [Parameter] public RenderFragment? CustomInput { get; set; }
+}

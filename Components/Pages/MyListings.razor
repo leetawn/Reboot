@@ -1,0 +1,320 @@
+@page "/my/listings"
+@using Reboot.Models
+@using Reboot.Services
+@inject IListingService ListingService
+@inject IOfferService OfferService
+@inject IOrderService OrderService
+@inject IUserService UserService
+@inject ICurrentUserService CurrentUserService
+@inject NavigationManager NavigationManager
+
+<PageTitle>My listings | @AppConfig.AppName</PageTitle>
+
+<PageHeader Title="Seller dashboard"
+            Description="Manage listings, review incoming buyer offers, and coordinate hand-overs for escrow-backed orders.">
+    <Actions>
+        <a href="/sell" class="px-3 py-1.5 bg-zinc-900 text-white text-xs font-semibold rounded-md hover:bg-zinc-800 transition-colors">
+            + List New Item
+        </a>
+    </Actions>
+</PageHeader>
+
+@if (!CurrentUserService.IsSignedIn)
+{
+    <div class="bg-white border border-zinc-200 rounded-md p-8 text-center max-w-md mx-auto my-8">
+        <h3 class="text-sm font-semibold text-zinc-900">Sign in required</h3>
+        <p class="text-xs text-zinc-600 mt-1 mb-4">
+            You must be signed in to access your seller dashboard.
+        </p>
+        <a href="/login?returnUrl=/my/listings" class="inline-block px-4 py-2 bg-zinc-900 text-white text-xs font-medium rounded-md hover:bg-zinc-800 transition-colors">
+            Sign in
+        </a>
+    </div>
+}
+else
+{
+    <!-- Feedback Banner -->
+    @if (!string.IsNullOrWhiteSpace(_feedbackMessage))
+    {
+        <div class="mb-6 p-3 rounded-sm border text-xs font-mono flex items-center justify-between @(_isError ? "bg-red-50 text-red-900 border-red-200" : "bg-zinc-100 text-zinc-900 border-zinc-300")">
+            <span>@_feedbackMessage</span>
+            <button type="button" @onclick="() => _feedbackMessage = null" class="font-bold px-1">✕</button>
+        </div>
+    }
+
+    <!-- Top KPI metrics -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div class="bg-white border border-zinc-200 rounded-sm p-4">
+            <span class="font-mono text-[11px] text-zinc-400 uppercase tracking-wider block">Active Listings</span>
+            <div class="text-2xl font-bold font-mono tabular-nums text-zinc-900 mt-1">@ActiveListingsCount</div>
+        </div>
+        <div class="bg-white border border-zinc-200 rounded-sm p-4">
+            <span class="font-mono text-[11px] text-zinc-400 uppercase tracking-wider block">Pending Buyer Offers</span>
+            <div class="text-2xl font-bold font-mono tabular-nums text-zinc-900 mt-1">@_incomingOffers.Count</div>
+        </div>
+        <div class="bg-white border border-zinc-200 rounded-sm p-4">
+            <span class="font-mono text-[11px] text-zinc-400 uppercase tracking-wider block">Orders Awaiting Handover</span>
+            <div class="text-2xl font-bold font-mono tabular-nums text-zinc-900 mt-1">@_ordersAwaitingHandover.Count</div>
+        </div>
+    </div>
+
+    <!-- Section 1: Orders Awaiting Hand-Over -->
+    @if (_ordersAwaitingHandover.Count > 0)
+    {
+        <div class="bg-white border border-zinc-200 rounded-sm p-5 mb-8 space-y-4">
+            <div class="flex items-center justify-between border-b border-zinc-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                    <h2 class="text-xs font-semibold uppercase tracking-wider font-mono text-zinc-900">
+                        Action Required: Payment Secured in Escrow
+                    </h2>
+                </div>
+                <span class="text-xs font-mono text-zinc-500">@_ordersAwaitingHandover.Count @(_ordersAwaitingHandover.Count == 1 ? "order" : "orders") awaiting handover</span>
+            </div>
+
+            <p class="text-xs text-zinc-600">
+                The platform is holding payment. Safe to proceed with physical hand-over or courier drop-off.
+            </p>
+
+            <div class="divide-y divide-zinc-100">
+                @foreach (var order in _ordersAwaitingHandover)
+                {
+                    var listing = ListingService.GetListingById(order.ListingId);
+                    var buyer = UserService.GetUserById(order.BuyerId);
+
+                    <div class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <div class="text-xs font-semibold text-zinc-900">
+                                @(listing?.Title ?? "Marketplace Item")
+                            </div>
+                            <div class="text-[11px] text-zinc-500 mt-0.5">
+                                Buyer: <strong class="text-zinc-800">@(buyer?.DisplayName ?? "Buyer")</strong> (@(buyer?.Location ?? "Cebu")), Price: <strong class="text-zinc-900">@AppConfig.FormatPrice(order.Price)</strong>, Method: @order.DeliveryMethod.ToString()
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <a href="/my/orders" class="px-3 py-1.5 border border-zinc-200 text-xs font-medium text-zinc-700 rounded-sm hover:bg-zinc-50">
+                                View Order
+                            </a>
+                            <button type="button" @onclick="() => HandleMarkHandedOver(order.Id)" class="px-3 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-sm hover:bg-zinc-800 transition-colors">
+                                Mark Handed Over / Shipped
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Section 2: Incoming Offers -->
+    @if (_incomingOffers.Count > 0)
+    {
+        <div class="bg-white border border-zinc-200 rounded-sm p-5 mb-8 space-y-4">
+            <div class="flex items-center justify-between border-b border-zinc-100 pb-3">
+                <h2 class="text-xs font-semibold uppercase tracking-wider font-mono text-zinc-900">
+                    Incoming Buyer Offers (@_incomingOffers.Count)
+                </h2>
+                <span class="text-xs text-zinc-400 font-mono">Accepting reserves item automatically</span>
+            </div>
+
+            <div class="divide-y divide-zinc-100">
+                @foreach (var offer in _incomingOffers)
+                {
+                    var listing = ListingService.GetListingById(offer.ListingId);
+                    var buyer = UserService.GetUserById(offer.BuyerId);
+
+                    <div class="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <a href="/listing/@offer.ListingId" class="text-xs font-semibold text-zinc-900 hover:underline">
+                                @(listing?.Title ?? "Listing")
+                            </a>
+                            <div class="text-[11px] text-zinc-500 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span>Buyer: @(buyer?.DisplayName ?? "Buyer")</span>
+                                <span>Offered: <strong class="text-zinc-900 font-bold">@AppConfig.FormatPrice(offer.Amount)</strong></span>
+                                <span>List Price: @AppConfig.FormatPrice(listing?.Price ?? 0)</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <button type="button" @onclick="() => HandleAcceptOffer(offer.Id)" class="px-3 py-1.5 bg-zinc-900 text-white text-xs font-semibold rounded-sm hover:bg-zinc-800 transition-colors">
+                                Accept Offer
+                            </button>
+                            <button type="button" @onclick="() => HandleDeclineOffer(offer.Id)" class="px-3 py-1.5 border border-zinc-200 text-zinc-700 text-xs font-medium rounded-sm hover:bg-zinc-50 transition-colors">
+                                Decline
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Section 3: Listings Inventory Table -->
+    <div class="bg-white border border-zinc-200 rounded-sm overflow-hidden space-y-0">
+        <!-- Table Header & Filter Tabs -->
+        <div class="px-5 py-4 border-b border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-50/50">
+            <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wider font-mono text-zinc-900">Inventory Items</h3>
+                <p class="text-xs text-zinc-500">All listings registered under your seller account</p>
+            </div>
+
+            <div class="flex items-center gap-1 font-mono text-xs">
+                @foreach (var tab in new[] { "All", "Active", "Reserved", "Sold", "Removed" })
+                {
+                    var isSelected = _selectedStatusTab == tab;
+                    <button type="button" @onclick="() => _selectedStatusTab = tab" class="px-2.5 py-1 rounded-sm border transition-colors @(isSelected ? "bg-zinc-900 text-white border-zinc-900 font-medium" : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300")">
+                        @tab
+                    </button>
+                }
+            </div>
+        </div>
+
+        @if (FilteredListings.Count == 0)
+        {
+            <div class="p-8 text-center text-xs text-zinc-500 font-mono">
+                No listings found matching "@_selectedStatusTab".
+            </div>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="border-b border-zinc-200 bg-zinc-50/50 text-zinc-500 font-mono uppercase text-[10px] tracking-wider">
+                            <th class="py-2.5 px-4 font-medium">Item Details</th>
+                            <th class="py-2.5 px-4 font-medium">Grade</th>
+                            <th class="py-2.5 px-4 font-medium">Price</th>
+                            <th class="py-2.5 px-4 font-medium">Status</th>
+                            <th class="py-2.5 px-4 font-medium">Created</th>
+                            <th class="py-2.5 px-4 font-medium text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100 font-mono">
+                        @foreach (var item in FilteredListings)
+                        {
+                            <tr class="hover:bg-zinc-50/50 transition-colors">
+                                <td class="py-3 px-4 font-sans">
+                                    <a href="/listing/@item.Id" class="font-medium text-zinc-900 hover:underline">
+                                        @item.Title
+                                    </a>
+                                    <div class="text-[11px] text-zinc-500">
+                                        @item.Brand, @item.Category.ToString()
+                                    </div>
+                                </td>
+                                <td class="py-3 px-4 whitespace-nowrap">
+                                    <GradeBadge Grade="@item.Grade" />
+                                </td>
+                                <td class="py-3 px-4 whitespace-nowrap tabular-nums font-semibold text-zinc-900">
+                                    @AppConfig.FormatPrice(item.Price)
+                                </td>
+                                <td class="py-3 px-4 whitespace-nowrap">
+                                    <span class="px-2 py-0.5 rounded-sm text-[10px] uppercase font-semibold @GetStatusBadge(item.Status)">
+                                        @item.Status.ToString()
+                                    </span>
+                                </td>
+                                <td class="py-3 px-4 whitespace-nowrap text-zinc-500 text-[11px] tabular-nums">
+                                    @item.CreatedDate.ToString("yyyy-MM-dd")
+                                </td>
+                                <td class="py-3 px-4 whitespace-nowrap text-right font-sans">
+                                    <div class="flex items-center justify-end gap-2 text-xs">
+                                        <a href="/listing/@item.Id" class="text-zinc-600 hover:text-zinc-900 underline underline-offset-2">
+                                            View
+                                        </a>
+                                        @if (item.Status == ListingStatus.Active)
+                                        {
+                                            <button type="button" @onclick="() => HandleRemoveListing(item.Id)" class="text-red-700 hover:text-red-900">
+                                                Remove
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Listing> _myListings = new();
+    private List<Offer> _incomingOffers = new();
+    private List<Order> _ordersAwaitingHandover = new();
+    private string _selectedStatusTab = "All";
+    private string? _feedbackMessage;
+    private bool _isError;
+
+    private int ActiveListingsCount => _myListings.Count(l => l.Status == ListingStatus.Active);
+
+    private List<Listing> FilteredListings => _selectedStatusTab switch
+    {
+        "Active" => _myListings.Where(l => l.Status == ListingStatus.Active).ToList(),
+        "Reserved" => _myListings.Where(l => l.Status == ListingStatus.Reserved).ToList(),
+        "Sold" => _myListings.Where(l => l.Status == ListingStatus.Sold).ToList(),
+        "Removed" => _myListings.Where(l => l.Status == ListingStatus.Removed).ToList(),
+        _ => _myListings
+    };
+
+    protected override void OnInitialized()
+    {
+        LoadDashboardData();
+    }
+
+    private void LoadDashboardData()
+    {
+        if (CurrentUserService.IsSignedIn)
+        {
+            var userId = CurrentUserService.UserId;
+            _myListings = ListingService.GetListingsBySeller(userId).ToList();
+            _incomingOffers = OfferService.GetIncomingOffersForSeller(userId).ToList();
+            _ordersAwaitingHandover = OrderService.GetOrdersBySeller(userId)
+                .Where(o => o.Status == OrderStatus.Paid)
+                .ToList();
+        }
+    }
+
+    private void HandleAcceptOffer(Guid offerId)
+    {
+        var result = OfferService.AcceptOffer(offerId, CurrentUserService.UserId);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadDashboardData();
+    }
+
+    private void HandleDeclineOffer(Guid offerId)
+    {
+        var result = OfferService.DeclineOffer(offerId, CurrentUserService.UserId);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadDashboardData();
+    }
+
+    private void HandleMarkHandedOver(Guid orderId)
+    {
+        var result = OrderService.MarkHandedOverOrShipped(orderId, CurrentUserService.UserId);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadDashboardData();
+    }
+
+    private void HandleRemoveListing(Guid listingId)
+    {
+        var success = ListingService.RemoveListing(listingId, CurrentUserService.UserId);
+        if (success)
+        {
+            _isError = false;
+            _feedbackMessage = "Listing removed.";
+            LoadDashboardData();
+        }
+    }
+
+    private string GetStatusBadge(ListingStatus status) => status switch
+    {
+        ListingStatus.Active => "bg-zinc-100 text-zinc-900 border border-zinc-200",
+        ListingStatus.Reserved => "bg-amber-100 text-amber-900 border border-amber-300",
+        ListingStatus.Sold => "bg-zinc-900 text-white",
+        ListingStatus.Removed => "bg-zinc-100 text-zinc-400 line-through",
+        _ => "bg-zinc-100 text-zinc-600"
+    };
+}

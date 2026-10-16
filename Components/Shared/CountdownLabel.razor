@@ -1,0 +1,73 @@
+@implements IDisposable
+
+<span class="inline-flex items-center gap-1.5 font-mono tabular-nums text-xs @TextClass">
+    <svg class="w-3.5 h-3.5 stroke-current flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+    </svg>
+    <span>@Prefix @FormattedTime</span>
+</span>
+
+@code {
+    [Parameter] public DateTime? Deadline { get; set; }
+    [Parameter] public string Prefix { get; set; } = string.Empty;
+    [Parameter] public string TextClass { get; set; } = "text-zinc-700";
+    [Parameter] public EventCallback OnExpired { get; set; }
+
+    private System.Threading.Timer? _timer;
+    private string FormattedTime = "—";
+    private bool _hasExpiredNotified = false;
+
+    protected override void OnInitialized()
+    {
+        UpdateFormattedTime();
+        _timer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                UpdateFormattedTime();
+                StateHasChanged();
+            });
+        }, null, 1000, 1000);
+    }
+
+    protected override void OnParametersSet()
+    {
+        UpdateFormattedTime();
+    }
+
+    private void UpdateFormattedTime()
+    {
+        if (!Deadline.HasValue)
+        {
+            FormattedTime = "No active timer";
+            return;
+        }
+
+        var remaining = Deadline.Value - DateTime.UtcNow;
+        if (remaining <= TimeSpan.Zero)
+        {
+            FormattedTime = "Expired";
+            if (!_hasExpiredNotified)
+            {
+                _hasExpiredNotified = true;
+                _ = OnExpired.InvokeAsync();
+            }
+            return;
+        }
+
+        if (remaining.TotalHours >= 1)
+        {
+            FormattedTime = $"{(int)remaining.TotalHours}h {remaining.Minutes:D2}m {remaining.Seconds:D2}s remaining";
+        }
+        else
+        {
+            FormattedTime = $"{remaining.Minutes:D2}m {remaining.Seconds:D2}s remaining";
+        }
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

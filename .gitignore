@@ -1,0 +1,22 @@
+## Build and output
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## IDE and tools
+.vs/
+.vscode/
+.idea/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+## OS files
+.DS_Store
+Thumbs.db
+
+## Standalone binaries
+*.exe
+tailwindcss.exe

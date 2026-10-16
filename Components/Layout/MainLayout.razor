@@ -1,0 +1,205 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ICurrentUserService CurrentUserService
+@inject NavigationManager NavigationManager
+
+<div class="min-h-screen flex flex-col bg-[#fafafa] text-zinc-900 font-sans antialiased selection:bg-zinc-900 selection:text-white">
+    <!-- Slim editorial header -->
+    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-zinc-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-4">
+            <!-- Brand / Logo -->
+            <div class="flex items-center gap-6">
+                <a href="/" class="text-base font-semibold tracking-tight text-zinc-900 hover:text-zinc-600 transition-colors">
+                    @AppConfig.AppName
+                </a>
+
+                <!-- Primary Nav links -->
+                <nav class="hidden md:flex items-center gap-1 text-xs font-medium">
+                    <NavLink href="browse" class="px-3 py-1.5 rounded-md transition-colors text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100" ActiveClass="!text-zinc-900 !font-semibold !bg-zinc-100">
+                        Browse
+                    </NavLink>
+
+                    <NavLink href="sell" class="px-3 py-1.5 rounded-md transition-colors text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100" ActiveClass="!text-zinc-900 !font-semibold !bg-zinc-100">
+                        Sell Gear
+                    </NavLink>
+
+                    @if (CurrentUserService.IsSignedIn)
+                    {
+                        <NavLink href="my/orders" class="px-3 py-1.5 rounded-md transition-colors text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100" ActiveClass="!text-zinc-900 !font-semibold !bg-zinc-100">
+                            Orders
+                        </NavLink>
+
+                        <NavLink href="my/listings" class="px-3 py-1.5 rounded-md transition-colors text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100" ActiveClass="!text-zinc-900 !font-semibold !bg-zinc-100">
+                            My Listings
+                        </NavLink>
+
+                        @if (CurrentUserService.IsAdmin)
+                        {
+                            <NavLink href="admin" class="px-3 py-1.5 rounded-md transition-colors text-zinc-900 bg-zinc-100 text-xs hover:bg-zinc-200" ActiveClass="!bg-zinc-900 !text-white">
+                                Admin
+                            </NavLink>
+                        }
+                    }
+                </nav>
+            </div>
+
+            <!-- Right section: Current user menu / Auth links -->
+            <div class="flex items-center gap-3">
+                @if (CurrentUserService.IsSignedIn && CurrentUserService.CurrentUser != null)
+                {
+                    var user = CurrentUserService.CurrentUser;
+
+                    <div class="relative">
+                        <button type="button" @onclick="ToggleUserMenu" class="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-zinc-200 bg-white hover:border-zinc-300 text-xs text-left transition-colors">
+                            <span class="w-6 h-6 rounded-full bg-zinc-900 text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
+                                @user.AvatarInitial
+                            </span>
+                            <span class="font-medium text-zinc-900 max-w-[120px] truncate">@user.DisplayName</span>
+                            @if (user.IsVerified)
+                            {
+                                <svg class="w-3.5 h-3.5 stroke-emerald-700 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" title="Verified">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                </svg>
+                            }
+                            <svg class="w-3.5 h-3.5 stroke-zinc-400" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+
+                        @if (_isUserMenuOpen)
+                        {
+                            <div class="absolute right-0 mt-1.5 w-64 bg-white border border-zinc-200 rounded-md shadow-sm py-1.5 z-50 text-xs">
+                                <div class="px-3 py-2 border-b border-zinc-100">
+                                    <div class="font-semibold text-zinc-900 flex items-center gap-1.5">
+                                        <span>@user.DisplayName</span>
+                                        @if (user.IsAdmin)
+                                        {
+                                            <span class="text-[9px] bg-zinc-900 text-white px-1.5 py-0.5 rounded uppercase font-medium">Admin</span>
+                                        }
+                                    </div>
+                                    <div class="text-[11px] text-zinc-500 truncate">@user.Email</div>
+                                    <div class="text-[11px] text-zinc-400 mt-0.5">@user.Location</div>
+                                </div>
+
+                                <div class="py-1">
+                                    <a href="/my/orders" @onclick="CloseUserMenu" class="block px-3 py-1.5 text-zinc-700 hover:bg-zinc-50">
+                                        Orders
+                                    </a>
+                                    <a href="/my/listings" @onclick="CloseUserMenu" class="block px-3 py-1.5 text-zinc-700 hover:bg-zinc-50">
+                                        My Listings
+                                    </a>
+                                    <a href="/seller/@user.Id" @onclick="CloseUserMenu" class="block px-3 py-1.5 text-zinc-700 hover:bg-zinc-50">
+                                        Account
+                                    </a>
+                                    @if (user.IsAdmin)
+                                    {
+                                        <a href="/admin" @onclick="CloseUserMenu" class="block px-3 py-1.5 font-medium text-zinc-900 hover:bg-zinc-50">
+                                            Admin
+                                        </a>
+                                    }
+                                </div>
+
+                                <div class="border-t border-zinc-100 pt-1">
+                                    <form method="post" action="/auth/logout">
+                                        <button type="submit" class="w-full text-left px-3 py-1.5 text-red-700 hover:bg-zinc-50 text-xs font-medium">
+                                            Sign out
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="flex items-center gap-3">
+                        <a href="/login" class="text-xs font-medium text-zinc-700 hover:text-zinc-900 transition-colors">
+                            Sign in
+                        </a>
+                        <a href="/register" class="inline-flex items-center justify-center px-3.5 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-md hover:bg-zinc-800 transition-colors">
+                            Create account
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Mobile nav bar row -->
+        <div class="md:hidden border-t border-zinc-200 px-4 py-2 flex items-center justify-around text-xs">
+            <NavLink href="browse" class="px-2 py-1 text-zinc-600 hover:text-zinc-900" ActiveClass="!font-semibold !text-zinc-900">
+                Browse
+            </NavLink>
+            <NavLink href="sell" class="px-2 py-1 text-zinc-600 hover:text-zinc-900" ActiveClass="!font-semibold !text-zinc-900">
+                Sell Gear
+            </NavLink>
+            @if (CurrentUserService.IsSignedIn)
+            {
+                <NavLink href="my/orders" class="px-2 py-1 text-zinc-600 hover:text-zinc-900" ActiveClass="!font-semibold !text-zinc-900">
+                    Orders
+                </NavLink>
+                <NavLink href="my/listings" class="px-2 py-1 text-zinc-600 hover:text-zinc-900" ActiveClass="!font-semibold !text-zinc-900">
+                    My Listings
+                </NavLink>
+                @if (CurrentUserService.IsAdmin)
+                {
+                    <NavLink href="admin" class="px-2 py-1 text-zinc-900 font-semibold" ActiveClass="!underline">
+                        Admin
+                    </NavLink>
+                }
+            }
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        @Body
+    </main>
+
+    <!-- Editorial Footer -->
+    <footer class="border-t border-zinc-200 bg-white mt-auto py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+                <a href="/" class="text-sm font-semibold text-zinc-900 hover:text-zinc-600 transition-colors">
+                    @AppConfig.AppName
+                </a>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-500">
+                <a href="/browse" class="hover:text-zinc-900 transition-colors">Browse</a>
+                <a href="/sell" class="hover:text-zinc-900 transition-colors">Sell Gear</a>
+                <a href="/terms" class="hover:text-zinc-900 transition-colors">Terms</a>
+                <a href="/privacy" class="hover:text-zinc-900 transition-colors">Privacy</a>
+                <span class="text-zinc-400">Metro Cebu, Philippines</span>
+            </div>
+        </div>
+    </footer>
+</div>
+
+@code {
+    private bool _isUserMenuOpen = false;
+
+    protected override void OnInitialized()
+    {
+        CurrentUserService.OnChange += HandleUserStateChanged;
+    }
+
+    private void HandleUserStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleUserMenu()
+    {
+        _isUserMenuOpen = !_isUserMenuOpen;
+    }
+
+    private void CloseUserMenu()
+    {
+        _isUserMenuOpen = false;
+    }
+
+    public void Dispose()
+    {
+        CurrentUserService.OnChange -= HandleUserStateChanged;
+    }
+}

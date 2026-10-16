@@ -1,0 +1,14 @@
+@using Reboot.Models
+
+<span class="inline-flex items-baseline gap-1 font-mono tabular-nums @CustomClass">
+    <span class="text-zinc-500 font-normal @SymbolClass">@AppConfig.CurrencySymbol</span><span class="font-semibold text-zinc-900 @AmountClass">@FormattedAmount</span>
+</span>
+
+@code {
+    [Parameter] public decimal Amount { get; set; }
+    [Parameter] public string? CustomClass { get; set; }
+    [Parameter] public string AmountClass { get; set; } = "text-base";
+    [Parameter] public string SymbolClass { get; set; } = "text-xs";
+
+    private string FormattedAmount => Amount.ToString("N0");
+}

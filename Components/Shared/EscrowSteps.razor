@@ -1,0 +1,120 @@
+@using Reboot.Models
+
+<div class="border border-zinc-200 rounded-sm bg-white p-4 @CustomClass">
+    <div class="flex items-center justify-between mb-3">
+        <span class="font-mono text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+            Escrow State
+        </span>
+        <span class="font-mono text-xs font-medium px-2 py-0.5 rounded-sm @StatusBadgeClass">
+            @StatusLabel
+        </span>
+    </div>
+
+    @if (CurrentStatus == OrderStatus.Cancelled)
+    {
+        <div class="p-3 bg-zinc-100 border border-zinc-200 rounded-sm text-xs text-zinc-700 font-mono">
+            Order cancelled. Reservation expired or cancelled prior to payment. Listing returned to active.
+        </div>
+    }
+    else if (CurrentStatus == OrderStatus.Disputed)
+    {
+        <div class="p-3 bg-amber-50 border border-amber-300 rounded-sm text-xs text-amber-900 font-mono">
+            Order under active dispute. Inspection paused and escrow balance frozen for administrative review.
+        </div>
+    }
+    else if (CurrentStatus == OrderStatus.Resolved)
+    {
+        <div class="p-3 bg-zinc-100 border border-zinc-300 rounded-sm text-xs text-zinc-800 font-mono">
+            Dispute resolved by platform administrator. Case concluded.
+        </div>
+    }
+    else
+    {
+        <!-- Horizontal Linear Step Indicator -->
+        <div class="grid grid-cols-5 gap-2 pt-2">
+            @for (int i = 0; i < Steps.Length; i++)
+            {
+                var stepIndex = i;
+                var stepName = Steps[i];
+                var isCompleted = CurrentStepIndex > stepIndex;
+                var isCurrent = CurrentStepIndex == stepIndex;
+
+                <div class="flex flex-col">
+                    <div class="flex items-center mb-1.5">
+                        <div class="h-1.5 w-full rounded-full transition-colors @(isCompleted ? "bg-zinc-900" : isCurrent ? "bg-zinc-900 ring-2 ring-zinc-300 ring-offset-1" : "bg-zinc-200")"></div>
+                    </div>
+                    <div class="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider @(isCurrent ? "font-bold text-zinc-900" : isCompleted ? "font-medium text-zinc-700" : "text-zinc-400")">
+                        <span>@(stepIndex + 1).</span>
+                        <span class="truncate">@stepName</span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Explanatory note beneath steps -->
+    <div class="mt-3 text-xs text-zinc-500">
+        @StepExplanation
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public OrderStatus CurrentStatus { get; set; }
+    [Parameter] public string? CustomClass { get; set; }
+
+    private static readonly string[] Steps = new[]
+    {
+        "Reserved",
+        "Paid (Held)",
+        "Handed Over",
+        "Confirmed",
+        "Released"
+    };
+
+    private int CurrentStepIndex => CurrentStatus switch
+    {
+        OrderStatus.Reserved => 0,
+        OrderStatus.Paid => 1,
+        OrderStatus.HandedOverOrShipped => 2,
+        OrderStatus.Confirmed => 3,
+        OrderStatus.Released => 4,
+        _ => -1
+    };
+
+    private string StatusLabel => CurrentStatus switch
+    {
+        OrderStatus.Reserved => "1/5: Item Reserved",
+        OrderStatus.Paid => "2/5: Escrow Held",
+        OrderStatus.HandedOverOrShipped => "3/5: Inspection Active",
+        OrderStatus.Confirmed => "4/5: Confirmed",
+        OrderStatus.Released => "5/5: Funds Released",
+        OrderStatus.Cancelled => "Cancelled",
+        OrderStatus.Disputed => "Dispute Open",
+        OrderStatus.Resolved => "Resolved",
+        _ => CurrentStatus.ToString()
+    };
+
+    private string StatusBadgeClass => CurrentStatus switch
+    {
+        OrderStatus.Released => "bg-zinc-900 text-white",
+        OrderStatus.Paid => "bg-zinc-100 text-zinc-900 border border-zinc-300",
+        OrderStatus.HandedOverOrShipped => "bg-zinc-900 text-white",
+        OrderStatus.Reserved => "bg-zinc-100 text-zinc-800 border border-zinc-200",
+        OrderStatus.Disputed => "bg-amber-100 text-amber-900 border border-amber-300",
+        OrderStatus.Cancelled => "bg-zinc-100 text-zinc-500 line-through",
+        _ => "bg-zinc-100 text-zinc-700"
+    };
+
+    private string StepExplanation => CurrentStatus switch
+    {
+        OrderStatus.Reserved => "Buyer has 24 hours to simulate payment. If unpaid, the item automatically reopens to the public.",
+        OrderStatus.Paid => "Payment is securely held in platform escrow. The seller can safely hand over or ship the item.",
+        OrderStatus.HandedOverOrShipped => "Item has been handed over / shipped. Buyer has 48 hours to inspect against the checklist. Funds release upon confirmation or window expiry.",
+        OrderStatus.Confirmed => "Buyer confirmed the item condition. Platform is releasing payout to seller.",
+        OrderStatus.Released => "Escrow complete. Funds released to seller. Both parties can now leave verified transaction reviews.",
+        OrderStatus.Disputed => "A dispute was filed by the buyer during the inspection window. Funds remain locked until administrator resolution.",
+        OrderStatus.Resolved => "Dispute concluded by administrator decision.",
+        OrderStatus.Cancelled => "Reservation expired or was cancelled by user.",
+        _ => string.Empty
+    };
+}

@@ -1,0 +1,545 @@
+@page "/my/orders"
+@using Reboot.Models
+@using Reboot.Services
+@inject IOrderService OrderService
+@inject IListingService ListingService
+@inject IDisputeService DisputeService
+@inject IUserService UserService
+@inject ICurrentUserService CurrentUserService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Orders | @AppConfig.AppName</PageTitle>
+
+<PageHeader Title="Orders &amp; escrow tracking"
+            Description="All orders are protected by the Reboot platform escrow state machine. Review active timers, release payouts, or file inspection disputes." />
+
+@if (!CurrentUserService.IsSignedIn)
+{
+    <div class="bg-white border border-zinc-200 rounded-md p-8 text-center max-w-md mx-auto my-8">
+        <h3 class="text-sm font-semibold text-zinc-900">Sign in required</h3>
+        <p class="text-xs text-zinc-600 mt-1 mb-4">You must be signed in to view your orders.</p>
+        <a href="/login?returnUrl=/my/orders" class="inline-block px-4 py-2 bg-zinc-900 text-white text-xs font-medium rounded-md hover:bg-zinc-800 transition-colors">Sign in</a>
+    </div>
+}
+else
+{
+    <!-- Feedback Banner -->
+    @if (!string.IsNullOrWhiteSpace(_feedbackMessage))
+    {
+        <div class="mb-6 p-3 rounded-sm border text-xs font-mono flex items-center justify-between @(_isError ? "bg-red-50 text-red-900 border-red-200" : "bg-zinc-100 text-zinc-900 border-zinc-300")">
+            <span>@_feedbackMessage</span>
+            <button type="button" @onclick="() => _feedbackMessage = null" class="font-bold px-1">✕</button>
+        </div>
+    }
+
+    <!-- Filter tabs -->
+    <div class="flex items-center gap-1.5 border-b border-zinc-200 pb-2 mb-6 font-mono text-xs overflow-x-auto">
+        @foreach (var tab in new[] { "All Orders", "Buying", "Selling", "Active Escrow", "Completed" })
+        {
+            var isSelected = _selectedTab == tab;
+            <button type="button" @onclick="() => SetTab(tab)" class="px-3 py-1.5 rounded-sm border transition-colors @(isSelected ? "bg-zinc-900 text-white border-zinc-900 font-semibold" : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300")">
+                @tab
+            </button>
+        }
+    </div>
+
+    @if (FilteredOrders.Count == 0)
+    {
+        <div class="bg-white border border-dashed border-zinc-300 rounded-sm p-12 text-center">
+            <h3 class="text-sm font-semibold text-zinc-900 font-mono">No Orders Found</h3>
+            <p class="text-xs text-zinc-500 mt-1">There are no orders matching "@_selectedTab" for your account.</p>
+            <a href="/browse" class="mt-4 inline-block px-4 py-2 bg-zinc-900 text-white text-xs font-medium rounded-sm">Browse Listings</a>
+        </div>
+    }
+    else
+    {
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Left 5 columns: Orders List -->
+            <div class="lg:col-span-5 space-y-3">
+                @foreach (var order in FilteredOrders)
+                {
+                    var listing = ListingService.GetListingById(order.ListingId);
+                    var isSelected = _selectedOrder?.Id == order.Id;
+                    var isBuyer = order.BuyerId == CurrentUserService.UserId;
+                    var counterparty = isBuyer ? UserService.GetUserById(order.SellerId) : UserService.GetUserById(order.BuyerId);
+
+                    <div @onclick="() => SelectOrder(order)" class="cursor-pointer border rounded-sm p-4 bg-white transition-all text-xs @(isSelected ? "border-zinc-900 ring-1 ring-zinc-900" : "border-zinc-200 hover:border-zinc-400")">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <span class="font-mono text-[10px] uppercase tracking-wider text-zinc-400 block mb-0.5">
+                                    @(isBuyer ? "Buying from" : "Selling to") @(counterparty?.DisplayName ?? "User")
+                                </span>
+                                <h4 class="font-medium text-zinc-900 line-clamp-1">
+                                    @(listing?.Title ?? "Marketplace Item")
+                                </h4>
+                            </div>
+                            <PriceTag Amount="@order.Price" AmountClass="font-bold text-sm" />
+                        </div>
+
+                        <div class="mt-3 pt-2.5 border-t border-zinc-100 flex items-center justify-between text-[11px] font-mono">
+                            <span class="px-2 py-0.5 rounded-sm font-semibold uppercase text-[10px] @GetStatusBadgeClass(order.Status)">
+                                @order.Status.ToString()
+                            </span>
+                            <span class="text-zinc-400 tabular-nums">
+                                @order.CreatedDate.ToString("yyyy-MM-dd")
+                            </span>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- Right 7 columns: Detailed Order View & Escrow Actions -->
+            <div class="lg:col-span-7">
+                @if (_selectedOrder != null)
+                {
+                    var order = _selectedOrder;
+                    var listing = ListingService.GetListingById(order.ListingId);
+                    var isBuyer = order.BuyerId == CurrentUserService.UserId;
+                    var isSeller = order.SellerId == CurrentUserService.UserId;
+                    var counterparty = isBuyer ? UserService.GetUserById(order.SellerId) : UserService.GetUserById(order.BuyerId);
+                    var activeDispute = DisputeService.GetDisputeByOrderId(order.Id);
+
+                    <div class="bg-white border border-zinc-200 rounded-sm p-6 space-y-6">
+                        <!-- Order Title Header -->
+                        <div class="border-b border-zinc-100 pb-4">
+                            <div class="flex items-center justify-between text-[11px] font-mono text-zinc-500 mb-1">
+                                <span>ORDER #@order.Id.ToString()[..8].ToUpperInvariant()</span>
+                                <span>@order.CreatedDate.ToString("MMM dd, yyyy HH:mm") UTC</span>
+                            </div>
+                            <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+                                <h2 class="text-lg font-bold text-zinc-900">
+                                    @(listing?.Title ?? "Marketplace Item")
+                                </h2>
+                                <PriceTag Amount="@order.Price" AmountClass="text-xl font-bold" />
+                            </div>
+                            <div class="mt-2 text-xs text-zinc-600 flex flex-wrap items-center gap-x-4 gap-y-1">
+                                <span>Role: <strong class="text-zinc-900">@(isBuyer ? "Buyer" : "Seller")</strong></span>
+                                <span>Counterparty: <strong class="text-zinc-900">@(counterparty?.DisplayName ?? "User")</strong> (@(counterparty?.Location ?? "Cebu"))</span>
+                                <span>Delivery: <strong>@order.DeliveryMethod.ToString()</strong></span>
+                            </div>
+                        </div>
+
+                        <!-- Horizontal Escrow Step Indicator -->
+                        <div>
+                            <EscrowSteps CurrentStatus="@order.Status" />
+                        </div>
+
+                        <!-- Active Window Countdown Timer -->
+                        @if (order.Status == OrderStatus.Reserved && order.ReservedUntil.HasValue)
+                        {
+                            <div class="p-3 bg-amber-50 border border-amber-300 rounded-sm flex items-center justify-between gap-3 text-xs">
+                                <div class="font-mono text-amber-900">
+                                    <strong>24-Hour Reservation Window Active</strong>
+                                    <div class="text-[11px] text-amber-800 opacity-90">Simulate payment to lock funds in escrow.</div>
+                                </div>
+                                <CountdownLabel Deadline="@order.ReservedUntil" Prefix="" TextClass="text-amber-900 font-bold" OnExpired="RefreshCurrentOrder" />
+                            </div>
+                        }
+                        else if (order.Status == OrderStatus.HandedOverOrShipped && order.InspectionDeadline.HasValue)
+                        {
+                            <div class="p-3 bg-zinc-100 border border-zinc-300 rounded-sm flex items-center justify-between gap-3 text-xs">
+                                <div class="font-mono text-zinc-900">
+                                    <strong>48-Hour Inspection Window Active</strong>
+                                    <div class="text-[11px] text-zinc-600">Buyer inspects hardware against condition report.</div>
+                                </div>
+                                <CountdownLabel Deadline="@order.InspectionDeadline" Prefix="" TextClass="text-zinc-900 font-bold" OnExpired="RefreshCurrentOrder" />
+                            </div>
+                        }
+
+                        <!-- Escrow Flow Contextual Actions -->
+                        <div class="pt-2 border-t border-zinc-100 space-y-4">
+                            <h3 class="font-mono text-xs uppercase tracking-wider text-zinc-500">Available Actions</h3>
+
+                            <!-- STATE: RESERVED -->
+                            @if (order.Status == OrderStatus.Reserved)
+                            {
+                                @if (isBuyer)
+                                {
+                                    <div class="space-y-3">
+                                        <p class="text-xs text-zinc-600">
+                                            The item is reserved for you. Submit simulated payment to hold funds securely in escrow.
+                                        </p>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <button type="button" @onclick="HandleSimulatePayment" class="px-4 py-2 bg-zinc-900 text-white text-xs font-semibold rounded-sm hover:bg-zinc-800 transition-colors">
+                                                Simulate Payment (@AppConfig.FormatPrice(order.Price) to Escrow)
+                                            </button>
+                                            <button type="button" @onclick="HandleCancelOrder" class="px-3 py-2 border border-zinc-300 text-zinc-700 text-xs font-medium rounded-sm hover:bg-zinc-50 transition-colors">
+                                                Cancel Reservation
+                                            </button>
+                                            <button type="button" @onclick="HandleSimulateExpireReservation" class="px-3 py-2 border border-dashed border-zinc-300 text-zinc-500 text-xs font-mono rounded-sm hover:text-zinc-900 hover:border-zinc-400">
+                                                ⚡ Fast-Forward Expire (Demo)
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <p class="text-xs text-zinc-600 font-mono">
+                                        Waiting for the buyer to submit payment within the 24-hour reservation window.
+                                    </p>
+                                }
+                            }
+
+                            <!-- STATE: PAID (HELD) -->
+                            else if (order.Status == OrderStatus.Paid)
+                            {
+                                @if (isSeller)
+                                {
+                                    <div class="space-y-3">
+                                        <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-mono">
+                                            ✓ Payment of @AppConfig.FormatPrice(order.Price) is secured in platform escrow. Safe to hand over or dispatch item.
+                                        </div>
+                                        <button type="button" @onclick="HandleMarkHandedOver" class="px-4 py-2 bg-zinc-900 text-white text-xs font-semibold rounded-sm hover:bg-zinc-800 transition-colors">
+                                            Mark Handed Over / Shipped
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="p-3 bg-zinc-50 border border-zinc-200 text-zinc-700 text-xs font-mono">
+                                        Your payment of @AppConfig.FormatPrice(order.Price) is secured in escrow. The seller has been notified to hand over or ship the item.
+                                    </div>
+                                }
+                            }
+
+                            <!-- STATE: HANDED OVER / SHIPPED (INSPECTION WINDOW) -->
+                            else if (order.Status == OrderStatus.HandedOverOrShipped)
+                            {
+                                @if (isBuyer)
+                                {
+                                    <div class="space-y-3">
+                                        <p class="text-xs text-zinc-600">
+                                            You have the item in your possession. Check each item against the verified condition report.
+                                        </p>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <button type="button" @onclick="HandleConfirmInspection" class="px-4 py-2 bg-zinc-900 text-white text-xs font-semibold rounded-sm hover:bg-zinc-800 transition-colors">
+                                                Confirm Condition &amp; Release Funds to Seller
+                                            </button>
+                                            <button type="button" @onclick="() => _showDisputeModal = true" class="px-3 py-2 border border-red-300 text-red-700 text-xs font-medium rounded-sm hover:bg-red-50 transition-colors">
+                                                Open Dispute
+                                            </button>
+                                            <button type="button" @onclick="HandleSimulateExpireInspection" class="px-3 py-2 border border-dashed border-zinc-300 text-zinc-500 text-xs font-mono rounded-sm hover:text-zinc-900 hover:border-zinc-400">
+                                                ⚡ Fast-Forward 48h (Auto-Release)
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="space-y-2">
+                                        <p class="text-xs text-zinc-600 font-mono">
+                                            The buyer is currently in the 48-hour inspection period. Funds will be released automatically if no dispute is filed.
+                                        </p>
+                                        <button type="button" @onclick="HandleSimulateExpireInspection" class="px-3 py-1.5 border border-dashed border-zinc-300 text-zinc-500 text-xs font-mono rounded-sm hover:text-zinc-900">
+                                            ⚡ Fast-Forward 48h (Auto-Release Demo)
+                                        </button>
+                                    </div>
+                                }
+                            }
+
+                            <!-- STATE: DISPUTED -->
+                            else if (order.Status == OrderStatus.Disputed)
+                            {
+                                <div class="bg-amber-50 border border-amber-300 rounded-sm p-4 space-y-2 text-xs">
+                                    <div class="font-mono font-bold text-amber-950 uppercase">Active Dispute Under Review</div>
+                                    @if (activeDispute != null)
+                                    {
+                                        <div class="text-zinc-800 space-y-1">
+                                            <div><strong>Reason:</strong> @activeDispute.Reason</div>
+                                            <div><strong>Evidence Notes:</strong> @activeDispute.EvidenceNotes</div>
+                                            <div class="text-[11px] text-zinc-500 font-mono">Filed on @activeDispute.CreatedDate.ToString("MMM dd, yyyy HH:mm") UTC</div>
+                                        </div>
+                                    }
+                                    <p class="text-zinc-600">
+                                        Escrow funds are frozen. Platform administrators will review both parties' statements on the Admin page to issue a refund, payout, or partial settlement.
+                                    </p>
+                                </div>
+                            }
+
+                            <!-- STATE: RESOLVED -->
+                            else if (order.Status == OrderStatus.Resolved)
+                            {
+                                <div class="bg-zinc-100 border border-zinc-300 rounded-sm p-4 text-xs space-y-1 font-mono">
+                                    <div class="font-bold text-zinc-900">Dispute Resolved</div>
+                                    @if (activeDispute != null)
+                                    {
+                                        <div>Resolution: <strong class="text-zinc-900">@activeDispute.Status.ToString()</strong></div>
+                                        @if (activeDispute.PartialRefundAmount.HasValue)
+                                        {
+                                            <div>Partial Refund Amount: <strong>@AppConfig.FormatPrice(activeDispute.PartialRefundAmount.Value)</strong></div>
+                                        }
+                                        <div>Admin Notes: @activeDispute.AdminNote</div>
+                                    }
+                                </div>
+                            }
+
+                            <!-- STATE: RELEASED (COMPLETED ESCROW) -->
+                            else if (order.Status == OrderStatus.Released)
+                            {
+                                <div class="p-3 bg-zinc-100 border border-zinc-200 rounded-sm text-xs font-mono text-zinc-800">
+                                    ✓ Escrow transaction concluded successfully. Funds released to seller on @order.ReleasedDate?.ToString("MMM dd, yyyy").
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Post-Completion Review Section -->
+                        @if (order.Status == OrderStatus.Released || order.Status == OrderStatus.Resolved)
+                        {
+                            <div class="pt-4 border-t border-zinc-100 space-y-3">
+                                <h3 class="font-mono text-xs uppercase tracking-wider text-zinc-500">Verified Transaction Review</h3>
+                                @if (ExistingReview != null)
+                                {
+                                    <div class="p-4 bg-zinc-50 border border-zinc-200 rounded-sm text-xs space-y-1">
+                                        <div class="flex items-center gap-1 text-zinc-900 font-mono font-bold">
+                                            @for (int s = 1; s <= ExistingReview.Rating; s++)
+                                            {
+                                                <span>★</span>
+                                            }
+                                            <span class="text-zinc-500 font-normal ml-1">(@ExistingReview.Rating / 5)</span>
+                                        </div>
+                                        <p class="text-zinc-700 italic">"@ExistingReview.Comment"</p>
+                                        <div class="text-[10px] text-zinc-400 font-mono">Submitted on @ExistingReview.CreatedDate.ToString("MMM dd, yyyy")</div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="bg-zinc-50 border border-zinc-200 rounded-sm p-4 space-y-3 text-xs">
+                                        <p class="text-zinc-600">
+                                            Leave feedback for @(counterparty?.DisplayName ?? "your trade partner"). This contributes directly to their seller reliability record.
+                                        </p>
+                                        <div class="flex items-center gap-2 font-mono">
+                                            <span class="text-zinc-500">Rating:</span>
+                                            @for (int star = 1; star <= 5; star++)
+                                            {
+                                                var val = star;
+                                                <button type="button" @onclick="() => _newReviewRating = val" class="text-base transition-colors @(_newReviewRating >= val ? "text-zinc-900" : "text-zinc-300")">
+                                                    ★
+                                                </button>
+                                            }
+                                            <span class="text-zinc-600 text-xs font-bold ml-1">@_newReviewRating / 5</span>
+                                        </div>
+                                        <textarea rows="2" @bind="_newReviewComment" placeholder="Write an honest comment regarding condition accuracy and handover promptness..." class="w-full bg-white border border-zinc-200 rounded-sm p-2 text-xs text-zinc-800"></textarea>
+                                        <button type="button" @onclick="HandleSubmitReview" class="px-4 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-sm hover:bg-zinc-800 transition-colors">
+                                            Submit Review
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Open Dispute Modal -->
+    @if (_showDisputeModal && _selectedOrder != null)
+    {
+        <div class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+            <div class="bg-white border border-zinc-300 rounded-sm max-w-lg w-full p-6 space-y-4">
+                <div class="flex items-center justify-between border-b border-zinc-200 pb-3">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider font-mono text-zinc-900">
+                        Open Inspection Dispute
+                    </h3>
+                    <button type="button" @onclick="() => _showDisputeModal = false" class="text-zinc-400 hover:text-zinc-700">✕</button>
+                </div>
+
+                <p class="text-xs text-zinc-600">
+                    Disputes freeze platform escrow payouts. Specify which checks from the condition report failed or which undisclosed defects were discovered.
+                </p>
+
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="font-mono text-zinc-700 block mb-1">Dispute Reason *</label>
+                        <input type="text" @bind="_disputeReason" placeholder="e.g. Left stick drifts noticeably, or disc drive will not read discs" class="w-full bg-zinc-50 border border-zinc-200 rounded-sm p-2 text-zinc-900" />
+                    </div>
+                    <div>
+                        <label class="font-mono text-zinc-700 block mb-1">Evidence &amp; Diagnostic Details *</label>
+                        <textarea rows="4" @bind="_disputeEvidenceNotes" placeholder="Describe diagnostic results and test steps conducted during your 48-hour window..." class="w-full bg-zinc-50 border border-zinc-200 rounded-sm p-2 text-zinc-900"></textarea>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100">
+                    <button type="button" @onclick="() => _showDisputeModal = false" class="px-3 py-1.5 border border-zinc-200 text-xs rounded-sm">Cancel</button>
+                    <button type="button" @onclick="HandleSubmitDispute" class="px-4 py-1.5 bg-red-700 text-white text-xs font-semibold rounded-sm hover:bg-red-800 transition-colors">
+                        Submit Dispute &amp; Freeze Escrow
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<Order> _orders = new();
+    private Order? _selectedOrder;
+    private string _selectedTab = "All Orders";
+    private string? _feedbackMessage;
+    private bool _isError;
+
+    // Review state
+    private int _newReviewRating = 5;
+    private string _newReviewComment = string.Empty;
+    private Review? ExistingReview => _selectedOrder != null && CurrentUserService.IsSignedIn
+        ? OrderService.GetReviewForOrder(_selectedOrder.Id, CurrentUserService.UserId)
+        : null;
+
+    // Dispute modal state
+    private bool _showDisputeModal = false;
+    private string _disputeReason = string.Empty;
+    private string _disputeEvidenceNotes = string.Empty;
+
+    private List<Order> FilteredOrders => _selectedTab switch
+    {
+        "Buying" => _orders.Where(o => o.BuyerId == CurrentUserService.UserId).ToList(),
+        "Selling" => _orders.Where(o => o.SellerId == CurrentUserService.UserId).ToList(),
+        "Active Escrow" => _orders.Where(o => o.Status == OrderStatus.Reserved || o.Status == OrderStatus.Paid || o.Status == OrderStatus.HandedOverOrShipped || o.Status == OrderStatus.Disputed).ToList(),
+        "Completed" => _orders.Where(o => o.Status == OrderStatus.Released || o.Status == OrderStatus.Resolved).ToList(),
+        _ => _orders
+    };
+
+    protected override void OnInitialized()
+    {
+        LoadOrders();
+    }
+
+    private void LoadOrders()
+    {
+        if (CurrentUserService.IsSignedIn)
+        {
+            _orders = OrderService.GetOrdersForUser(CurrentUserService.UserId).ToList();
+            if (_selectedOrder != null)
+            {
+                _selectedOrder = _orders.FirstOrDefault(o => o.Id == _selectedOrder.Id) ?? _orders.FirstOrDefault();
+            }
+            else
+            {
+                _selectedOrder = _orders.FirstOrDefault();
+            }
+        }
+    }
+
+    private void SetTab(string tab)
+    {
+        _selectedTab = tab;
+        var filtered = FilteredOrders;
+        if (filtered.Count > 0 && (_selectedOrder == null || !filtered.Any(o => o.Id == _selectedOrder.Id)))
+        {
+            _selectedOrder = filtered.First();
+        }
+    }
+
+    private void SelectOrder(Order order)
+    {
+        _selectedOrder = order;
+        _newReviewRating = 5;
+        _newReviewComment = string.Empty;
+    }
+
+    private void RefreshCurrentOrder()
+    {
+        LoadOrders();
+        StateHasChanged();
+    }
+
+    private void HandleSimulatePayment()
+    {
+        if (_selectedOrder == null) return;
+        var result = OrderService.SimulatePayment(_selectedOrder.Id, CurrentUserService.UserId);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadOrders();
+    }
+
+    private void HandleCancelOrder()
+    {
+        if (_selectedOrder == null) return;
+        var result = OrderService.CancelOrder(_selectedOrder.Id, CurrentUserService.UserId);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadOrders();
+    }
+
+    private void HandleMarkHandedOver()
+    {
+        if (_selectedOrder == null) return;
+        var result = OrderService.MarkHandedOverOrShipped(_selectedOrder.Id, CurrentUserService.UserId);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadOrders();
+    }
+
+    private void HandleConfirmInspection()
+    {
+        if (_selectedOrder == null) return;
+        var result = OrderService.ConfirmInspection(_selectedOrder.Id, CurrentUserService.UserId);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadOrders();
+    }
+
+    private void HandleSimulateExpireInspection()
+    {
+        if (_selectedOrder == null) return;
+        var result = OrderService.SimulateExpireInspectionWindow(_selectedOrder.Id);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadOrders();
+    }
+
+    private void HandleSimulateExpireReservation()
+    {
+        if (_selectedOrder == null) return;
+        var result = OrderService.SimulateExpireReservationWindow(_selectedOrder.Id);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadOrders();
+    }
+
+    private void HandleSubmitDispute()
+    {
+        if (_selectedOrder == null) return;
+        if (string.IsNullOrWhiteSpace(_disputeReason) || string.IsNullOrWhiteSpace(_disputeEvidenceNotes))
+        {
+            _isError = true;
+            _feedbackMessage = "Please provide both a reason and evidence notes.";
+            return;
+        }
+
+        var result = DisputeService.OpenDispute(_selectedOrder.Id, CurrentUserService.UserId, _disputeReason, _disputeEvidenceNotes);
+        _showDisputeModal = false;
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadOrders();
+    }
+
+    private void HandleSubmitReview()
+    {
+        if (_selectedOrder == null) return;
+        if (string.IsNullOrWhiteSpace(_newReviewComment))
+        {
+            _isError = true;
+            _feedbackMessage = "Please enter a comment for your review.";
+            return;
+        }
+
+        var result = OrderService.SubmitReview(_selectedOrder.Id, CurrentUserService.UserId, _newReviewRating, _newReviewComment);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        _newReviewComment = string.Empty;
+        LoadOrders();
+    }
+
+    private string GetStatusBadgeClass(OrderStatus status) => status switch
+    {
+        OrderStatus.Reserved => "bg-zinc-100 text-zinc-900 border border-zinc-200",
+        OrderStatus.Paid => "bg-zinc-100 text-zinc-900 border border-zinc-300",
+        OrderStatus.HandedOverOrShipped => "bg-zinc-900 text-white",
+        OrderStatus.Confirmed => "bg-zinc-900 text-white",
+        OrderStatus.Released => "bg-zinc-900 text-white",
+        OrderStatus.Disputed => "bg-amber-100 text-amber-900 border border-amber-300",
+        OrderStatus.Resolved => "bg-zinc-100 text-zinc-700 border border-zinc-300",
+        OrderStatus.Cancelled => "bg-zinc-100 text-zinc-400 line-through",
+        _ => "bg-zinc-100 text-zinc-600"
+    };
+}

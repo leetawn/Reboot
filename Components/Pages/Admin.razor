@@ -1,0 +1,418 @@
+@page "/admin"
+@using Reboot.Models
+@using Reboot.Services
+@inject IDisputeService DisputeService
+@inject IOrderService OrderService
+@inject IListingService ListingService
+@inject IUserService UserService
+@inject ICurrentUserService CurrentUserService
+@inject NavigationManager NavigationManager
+
+<!--
+=============================================================================================
+[AUTHORIZATION BOUNDARY - REAL AUTHORIZATION WOULD GO HERE]
+In production, this page would require [Authorize(Roles = "Admin")] or an ASP.NET Core
+Authorization Policy (e.g. Policy = "RequireMarketplaceAdminRole").
+In Blazor, this is usually enforced with <AuthorizeRouteView> and AuthorizeAttribute.
+For this app, we verify that CurrentUserService.IsAdmin is true.
+=============================================================================================
+-->
+
+<PageTitle>Admin | @AppConfig.AppName</PageTitle>
+
+@if (!CurrentUserService.IsSignedIn || !CurrentUserService.IsAdmin)
+{
+    <div class="bg-white border border-red-200 rounded-md p-8 text-center max-w-md mx-auto my-12 space-y-4">
+        <h2 class="text-base font-bold text-zinc-900">Administrator privileges required</h2>
+        <p class="text-xs text-zinc-600">
+            You must be signed in with an administrator account to access dispute resolution and user verification.
+        </p>
+        <div class="pt-2">
+            <a href="/login?returnUrl=/admin" class="inline-block px-4 py-2 bg-zinc-900 text-white text-xs font-medium rounded-md hover:bg-zinc-800 transition-colors">
+                Sign in as admin
+            </a>
+        </div>
+    </div>
+}
+else
+{
+    <PageHeader Title="Platform administration"
+                Description="Review open inspection disputes, issue escrow resolutions, approve seller identity verifications, and moderate listings." />
+
+    <!-- Feedback Message -->
+    @if (!string.IsNullOrWhiteSpace(_feedbackMessage))
+    {
+        <div class="mb-6 p-3 rounded-sm border text-xs font-mono flex items-center justify-between @(_isError ? "bg-red-50 text-red-900 border-red-200" : "bg-zinc-100 text-zinc-900 border-zinc-300")">
+            <span>@_feedbackMessage</span>
+            <button type="button" @onclick="() => _feedbackMessage = null" class="font-bold px-1">✕</button>
+        </div>
+    }
+
+    <!-- Admin Navigation Tabs -->
+    <div class="flex items-center gap-1.5 border-b border-zinc-200 pb-2 mb-6 font-mono text-xs overflow-x-auto">
+        <button type="button" @onclick='() => _activeTab = "disputes"' class="px-3 py-1.5 rounded-sm border transition-colors @(_activeTab == "disputes" ? "bg-zinc-900 text-white border-zinc-900 font-semibold" : "bg-white text-zinc-700 border-zinc-200")">
+            Open Disputes (@_openDisputes.Count)
+        </button>
+        <button type="button" @onclick='() => _activeTab = "users"' class="px-3 py-1.5 rounded-sm border transition-colors @(_activeTab == "users" ? "bg-zinc-900 text-white border-zinc-900 font-semibold" : "bg-white text-zinc-700 border-zinc-200")">
+            ID Verification Queue (@_unverifiedUsers.Count)
+        </button>
+        <button type="button" @onclick='() => _activeTab = "listings"' class="px-3 py-1.5 rounded-sm border transition-colors @(_activeTab == "listings" ? "bg-zinc-900 text-white border-zinc-900 font-semibold" : "bg-white text-zinc-700 border-zinc-200")">
+            All Listings Moderation (@_allListings.Count)
+        </button>
+    </div>
+
+    <!-- TAB 1: OPEN DISPUTES -->
+    @if (_activeTab == "disputes")
+    {
+        <div class="space-y-6">
+            @if (_openDisputes.Count == 0)
+            {
+                <div class="bg-white border border-zinc-200 rounded-sm p-8 text-center text-xs text-zinc-500 font-mono">
+                    ✓ All inspection disputes have been resolved. Escrow queues are clear.
+                </div>
+            }
+            else
+            {
+                <div class="space-y-6">
+                    @foreach (var dispute in _openDisputes)
+                    {
+                        var order = OrderService.GetOrderById(dispute.OrderId);
+                        var listing = order != null ? ListingService.GetListingById(order.ListingId) : null;
+                        var buyer = order != null ? UserService.GetUserById(order.BuyerId) : null;
+                        var seller = order != null ? UserService.GetUserById(order.SellerId) : null;
+
+                        <div class="bg-white border border-zinc-300 rounded-sm p-6 space-y-4">
+                            <div class="flex flex-col sm:flex-row sm:items-baseline justify-between border-b border-zinc-200 pb-3 gap-2">
+                                <div>
+                                    <span class="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-sm font-semibold">
+                                        Escrow Frozen, Dispute #@dispute.Id.ToString()[..8].ToUpperInvariant()
+                                    </span>
+                                    <h3 class="text-base font-bold text-zinc-900 mt-2">
+                                        @(listing?.Title ?? "Marketplace Item")
+                                    </h3>
+                                    <div class="text-xs text-zinc-500 mt-0.5">
+                                        Order Price: <strong class="text-zinc-900">@AppConfig.FormatPrice(order?.Price ?? 0)</strong>, Opened @dispute.CreatedDate.ToString("MMM dd, yyyy HH:mm") UTC
+                                    </div>
+                                </div>
+
+                                <div class="font-mono text-xs text-zinc-600 sm:text-right">
+                                    <div>Buyer: <strong class="text-zinc-900">@(buyer?.DisplayName ?? "Buyer")</strong> (@(buyer?.Location ?? "Cebu"))</div>
+                                    <div>Seller: <strong class="text-zinc-900">@(seller?.DisplayName ?? "Seller")</strong> (@(seller?.Location ?? "Cebu"))</div>
+                                </div>
+                            </div>
+
+                            <!-- Claims & Evidence -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-sm space-y-1">
+                                    <span class="font-mono text-[10px] uppercase text-zinc-500 block">Buyer's Claim &amp; Reason</span>
+                                    <div class="font-medium text-zinc-900">@dispute.Reason</div>
+                                </div>
+
+                                <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-sm space-y-1">
+                                    <span class="font-mono text-[10px] uppercase text-zinc-500 block">Evidence &amp; Test Notes</span>
+                                    <div class="text-zinc-700 whitespace-pre-line">@dispute.EvidenceNotes</div>
+                                </div>
+                            </div>
+
+                            <!-- Resolution Form -->
+                            <div class="pt-4 border-t border-zinc-200 space-y-3">
+                                <div class="font-mono text-xs font-semibold uppercase text-zinc-800">
+                                    Administrative Resolution Decision
+                                </div>
+
+                                <div>
+                                    <label class="font-mono text-[11px] text-zinc-600 block mb-1">Administrative Findings / Public Note</label>
+                                    <input type="text"
+                                           @bind="_adminNotes[dispute.Id]"
+                                           placeholder="State reasoning for ruling (e.g. Defect verified; debouncing failure confirmed in testing)..."
+                                           class="w-full text-xs bg-zinc-50 border border-zinc-300 rounded-sm px-3 py-1.5 text-zinc-900" />
+                                </div>
+
+                                <div class="flex flex-wrap items-center gap-3 pt-1">
+                                    <!-- Outcome 1: Full Refund -->
+                                    <button type="button"
+                                            @onclick="() => HandleResolveRefund(dispute.Id)"
+                                            class="px-4 py-2 bg-zinc-900 text-white text-xs font-semibold rounded-sm hover:bg-zinc-800 transition-colors">
+                                        1. Resolve: Full Refund to Buyer (@AppConfig.FormatPrice(order?.Price ?? 0))
+                                    </button>
+
+                                    <!-- Outcome 2: Release to Seller -->
+                                    <button type="button"
+                                            @onclick="() => HandleResolveRelease(dispute.Id)"
+                                            class="px-4 py-2 border border-zinc-300 bg-white text-zinc-900 text-xs font-semibold rounded-sm hover:bg-zinc-50 transition-colors">
+                                        2. Resolve: Release Escrow to Seller
+                                    </button>
+
+                                    <!-- Outcome 3: Partial Refund -->
+                                    <div class="flex items-center gap-1.5 font-mono text-xs">
+                                        <input type="number"
+                                               step="100"
+                                               @bind="_partialAmounts[dispute.Id]"
+                                               placeholder="₱ Amount"
+                                               class="w-24 bg-zinc-50 border border-zinc-300 rounded-sm px-2 py-1.5 text-xs text-zinc-900 tabular-nums" />
+                                        <button type="button"
+                                                @onclick="() => HandleResolvePartial(dispute.Id)"
+                                                class="px-3 py-2 bg-amber-700 text-white text-xs font-semibold rounded-sm hover:bg-amber-800 transition-colors">
+                                            3. Resolve: Partial Refund
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- Resolved Disputes History -->
+            @if (_resolvedDisputes.Count > 0)
+            {
+                <div class="mt-8 space-y-3">
+                    <h3 class="font-mono text-xs uppercase tracking-wider text-zinc-500">
+                        Resolved Disputes Archive (@_resolvedDisputes.Count)
+                    </h3>
+                    <div class="bg-white border border-zinc-200 rounded-sm divide-y divide-zinc-100 text-xs font-mono">
+                        @foreach (var res in _resolvedDisputes)
+                        {
+                            <div class="p-3 flex items-center justify-between">
+                                <div>
+                                    <span class="font-semibold text-zinc-900">#@res.Id.ToString()[..8].ToUpperInvariant()</span>
+                                    <span class="text-zinc-500 ml-2">Reason: @res.Reason</span>
+                                    <div class="text-[11px] text-zinc-400 mt-0.5">Admin note: @res.AdminNote</div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="px-2 py-0.5 rounded-sm font-semibold uppercase text-[10px] bg-zinc-100 text-zinc-800">
+                                        @res.Status.ToString()
+                                    </span>
+                                    <div class="text-[10px] text-zinc-400 mt-0.5">@res.ResolvedDate?.ToString("yyyy-MM-dd")</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- TAB 2: UNVERIFIED USERS QUEUE -->
+    else if (_activeTab == "users")
+    {
+        <div class="bg-white border border-zinc-200 rounded-sm overflow-hidden">
+            <div class="p-4 border-b border-zinc-200 bg-zinc-50/50">
+                <h3 class="text-xs font-semibold uppercase tracking-wider font-mono text-zinc-900">
+                    ID Verification Queue
+                </h3>
+                <p class="text-xs text-zinc-500">Unverified users who have submitted simulated identity verification requests</p>
+            </div>
+
+            @if (_unverifiedUsers.Count == 0)
+            {
+                <div class="p-8 text-center text-xs text-zinc-500 font-mono">
+                    All registered accounts are currently verified.
+                </div>
+            }
+            else
+            {
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="border-b border-zinc-200 bg-zinc-50/50 text-zinc-500 font-mono uppercase text-[10px] tracking-wider">
+                            <th class="py-2.5 px-4 font-medium">User</th>
+                            <th class="py-2.5 px-4 font-medium">Email</th>
+                            <th class="py-2.5 px-4 font-medium">Location</th>
+                            <th class="py-2.5 px-4 font-medium">Registered</th>
+                            <th class="py-2.5 px-4 font-medium text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100 font-mono">
+                        @foreach (var user in _unverifiedUsers)
+                        {
+                            <tr class="hover:bg-zinc-50/50 transition-colors">
+                                <td class="py-3 px-4 font-sans font-semibold text-zinc-900">
+                                    @user.DisplayName
+                                </td>
+                                <td class="py-3 px-4 text-zinc-600">
+                                    @user.Email
+                                </td>
+                                <td class="py-3 px-4 text-zinc-600">
+                                    @user.Location
+                                </td>
+                                <td class="py-3 px-4 text-zinc-400 tabular-nums">
+                                    @user.JoinedDate.ToString("yyyy-MM-dd")
+                                </td>
+                                <td class="py-3 px-4 text-right">
+                                    <button type="button"
+                                            @onclick="() => HandleVerifyUser(user.Id)"
+                                            class="px-3 py-1 bg-zinc-900 text-white text-xs font-semibold rounded-sm hover:bg-zinc-800 transition-colors">
+                                        Verify ID &amp; Grant Listing Rights
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    }
+
+    <!-- TAB 3: ALL LISTINGS MODERATION -->
+    else if (_activeTab == "listings")
+    {
+        <div class="bg-white border border-zinc-200 rounded-sm overflow-hidden">
+            <div class="p-4 border-b border-zinc-200 bg-zinc-50/50 flex items-center justify-between">
+                <div>
+                    <h3 class="text-xs font-semibold uppercase tracking-wider font-mono text-zinc-900">
+                        Platform Marketplace Listings
+                    </h3>
+                    <p class="text-xs text-zinc-500">Full audit log of active, reserved, and sold listings</p>
+                </div>
+                <span class="font-mono text-xs text-zinc-500">@_allListings.Count total items</span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="border-b border-zinc-200 bg-zinc-50/50 text-zinc-500 font-mono uppercase text-[10px] tracking-wider">
+                            <th class="py-2.5 px-4 font-medium">Title &amp; Brand</th>
+                            <th class="py-2.5 px-4 font-medium">Seller</th>
+                            <th class="py-2.5 px-4 font-medium">Grade</th>
+                            <th class="py-2.5 px-4 font-medium">Price</th>
+                            <th class="py-2.5 px-4 font-medium">Status</th>
+                            <th class="py-2.5 px-4 font-medium text-right">Moderation</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100 font-mono">
+                        @foreach (var item in _allListings)
+                        {
+                            var seller = UserService.GetUserById(item.SellerId);
+
+                            <tr class="hover:bg-zinc-50/50 transition-colors">
+                                <td class="py-3 px-4 font-sans">
+                                    <a href="/listing/@item.Id" class="font-semibold text-zinc-900 hover:underline">
+                                        @item.Title
+                                    </a>
+                                    <div class="text-[11px] text-zinc-400">@item.Brand, @item.Category.ToString()</div>
+                                </td>
+                                <td class="py-3 px-4 font-sans text-zinc-700">
+                                    @(seller?.DisplayName ?? "Seller")
+                                </td>
+                                <td class="py-3 px-4 whitespace-nowrap">
+                                    <GradeBadge Grade="@item.Grade" />
+                                </td>
+                                <td class="py-3 px-4 whitespace-nowrap font-bold text-zinc-900 tabular-nums">
+                                    @AppConfig.FormatPrice(item.Price)
+                                </td>
+                                <td class="py-3 px-4 whitespace-nowrap">
+                                    <span class="px-2 py-0.5 rounded-sm text-[10px] uppercase font-semibold @(item.Status == ListingStatus.Active ? "bg-zinc-100 text-zinc-900 border border-zinc-200" : "bg-zinc-100 text-zinc-500")">
+                                        @item.Status.ToString()
+                                    </span>
+                                </td>
+                                <td class="py-3 px-4 whitespace-nowrap text-right font-sans">
+                                    @if (item.Status == ListingStatus.Active)
+                                    {
+                                        <button type="button" @onclick="() => HandleAdminRemoveListing(item.Id)" class="px-2.5 py-1 border border-red-200 text-red-700 text-xs font-medium rounded-sm hover:bg-red-50">
+                                            Remove
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-zinc-400 text-xs">—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private string _activeTab = "disputes";
+    private List<Dispute> _openDisputes = new();
+    private List<Dispute> _resolvedDisputes = new();
+    private List<User> _unverifiedUsers = new();
+    private List<Listing> _allListings = new();
+
+    private Dictionary<Guid, string> _adminNotes = new();
+    private Dictionary<Guid, decimal> _partialAmounts = new();
+
+    private string? _feedbackMessage;
+    private bool _isError;
+
+    protected override void OnInitialized()
+    {
+        LoadAdminData();
+    }
+
+    private void LoadAdminData()
+    {
+        var allDisputes = DisputeService.GetAllDisputes();
+        _openDisputes = allDisputes.Where(d => d.Status == DisputeStatus.Open).ToList();
+        _resolvedDisputes = allDisputes.Where(d => d.Status != DisputeStatus.Open).ToList();
+        _unverifiedUsers = UserService.GetUnverifiedUsers().ToList();
+        _allListings = ListingService.GetAllListingsAdmin().ToList();
+
+        foreach (var dispute in _openDisputes)
+        {
+            if (!_adminNotes.ContainsKey(dispute.Id))
+            {
+                _adminNotes[dispute.Id] = string.Empty;
+            }
+            if (!_partialAmounts.ContainsKey(dispute.Id))
+            {
+                var order = OrderService.GetOrderById(dispute.OrderId);
+                _partialAmounts[dispute.Id] = order != null ? Math.Round(order.Price / 2, 0) : 500;
+            }
+        }
+    }
+
+    private void HandleResolveRefund(Guid disputeId)
+    {
+        var note = _adminNotes.GetValueOrDefault(disputeId, string.Empty);
+        var result = DisputeService.ResolveRefund(disputeId, CurrentUserService.UserId, note);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadAdminData();
+    }
+
+    private void HandleResolveRelease(Guid disputeId)
+    {
+        var note = _adminNotes.GetValueOrDefault(disputeId, string.Empty);
+        var result = DisputeService.ResolveRelease(disputeId, CurrentUserService.UserId, note);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadAdminData();
+    }
+
+    private void HandleResolvePartial(Guid disputeId)
+    {
+        var note = _adminNotes.GetValueOrDefault(disputeId, string.Empty);
+        var amount = _partialAmounts.GetValueOrDefault(disputeId, 500);
+        var result = DisputeService.ResolvePartial(disputeId, CurrentUserService.UserId, amount, note);
+        _isError = !result.Success;
+        _feedbackMessage = result.Message;
+        LoadAdminData();
+    }
+
+    private void HandleVerifyUser(string userId)
+    {
+        var success = UserService.VerifyUser(userId);
+        if (success)
+        {
+            _isError = false;
+            _feedbackMessage = "User identity verified successfully. Listing rights granted.";
+            LoadAdminData();
+        }
+    }
+
+    private void HandleAdminRemoveListing(Guid listingId)
+    {
+        var success = ListingService.RemoveListing(listingId, CurrentUserService.UserId);
+        if (success)
+        {
+            _isError = false;
+            _feedbackMessage = "Listing removed by administrator.";
+            LoadAdminData();
+        }
+    }
+}
