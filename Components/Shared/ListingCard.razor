@@ -5,10 +5,6 @@
 <a href="/listing/@Listing.Id" class="group block border border-zinc-200 bg-white hover:border-zinc-400 transition-colors duration-150 rounded-md overflow-hidden flex flex-col h-full @CustomClass">
     <!-- Image block: Display real photo if available, or architectural monogram fallback -->
     <div class="relative bg-zinc-100 w-full flex flex-col items-center justify-center border-b border-zinc-200 overflow-hidden" style="height: 190px; width: 100%;">
-        <!-- Grade badge in top-left -->
-        <div class="absolute top-2.5 left-2.5 z-10">
-            <GradeBadge Grade="@Listing.Grade" />
-        </div>
 
         @if (Listing.Status == ListingStatus.Reserved)
         {
@@ -59,9 +55,12 @@
         <div>
             <div class="flex items-baseline justify-between gap-2">
                 <PriceTag Amount="@Listing.Price" AmountClass="text-lg font-bold" />
-                <span class="text-[11px] text-zinc-400">
-                    @Listing.Category.ToString()
-                </span>
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                    <GradeBadge Grade="@Listing.Grade" />
+                    <span class="text-[11px] text-zinc-400">
+                        @Listing.Category.ToString()
+                    </span>
+                </div>
             </div>
 
             <h3 class="text-sm font-medium text-zinc-900 mt-1.5 line-clamp-2 group-hover:text-zinc-700 leading-snug">
