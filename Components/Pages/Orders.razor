@@ -7,6 +7,7 @@
 @inject IUserService UserService
 @inject ICurrentUserService CurrentUserService
 @inject NavigationManager NavigationManager
+@inject IToastService ToastService
 
 <PageTitle>Orders | @AppConfig.AppName</PageTitle>
 
@@ -23,15 +24,6 @@
 }
 else
 {
-    <!-- Feedback Banner -->
-    @if (!string.IsNullOrWhiteSpace(_feedbackMessage))
-    {
-        <div class="mb-6 p-3 rounded-sm border text-xs font-mono flex items-center justify-between @(_isError ? "bg-red-50 text-red-900 border-red-200" : "bg-zinc-100 text-zinc-900 border-zinc-300")">
-            <span>@_feedbackMessage</span>
-            <button type="button" @onclick="() => _feedbackMessage = null" class="font-bold px-1">✕</button>
-        </div>
-    }
-
     <!-- Filter tabs -->
     <div class="flex items-center gap-1.5 border-b border-zinc-200 pb-2 mb-6 font-mono text-xs overflow-x-auto">
         @foreach (var tab in new[] { "All Orders", "Buying", "Selling", "Active Escrow", "Completed" })
@@ -148,11 +140,42 @@ else
 
                         <!-- Escrow Flow Contextual Actions -->
                         <div class="pt-2 border-t border-zinc-100 space-y-4">
-                            <h3 class="font-mono text-xs uppercase tracking-wider text-zinc-500">Available Actions</h3>
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-mono text-xs uppercase tracking-wider text-zinc-500">Available Actions</h3>
+                                @if (_activeAction != null)
+                                {
+                                    <span class="inline-flex items-center gap-1.5 text-[11px] font-mono text-zinc-600">
+                                        <svg class="animate-spin w-3 h-3 text-zinc-800" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                        </svg>
+                                        Processing action...
+                                    </span>
+                                }
+                            </div>
 
-                            <!-- STATE: RESERVED -->
+                            <!-- In-Place Contextual Feedback (Visible without scrolling) -->
+                            @if (!string.IsNullOrWhiteSpace(_feedbackMessage))
+                            {
+                                <div class="p-3 rounded-sm border text-xs font-mono flex items-center justify-between animate-in @(_isError ? "bg-red-50 text-red-900 border-red-200" : "bg-emerald-50 text-emerald-900 border-emerald-200")">
+                                    <div class="flex items-center gap-2">
+                                        @if (_isError)
+                                        {
+                                            <span class="font-bold">✕</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="font-bold text-emerald-700">✓</span>
+                                        }
+                                        <span>@_feedbackMessage</span>
+                                    </div>
+                                    <button type="button" @onclick="() => _feedbackMessage = null" class="font-bold px-1.5 text-xs hover:opacity-75">✕</button>
+                                </div>
+                            }
+
                             @if (order.Status == OrderStatus.Reserved)
                             {
+                                @* STATE: RESERVED *@
                                 @if (isBuyer)
                                 {
                                     <div class="space-y-3">
@@ -160,14 +183,58 @@ else
                                             The item is reserved for you. Submit simulated payment to hold funds securely in escrow.
                                         </p>
                                         <div class="flex flex-wrap items-center gap-2">
-                                            <button type="button" @onclick="HandleSimulatePayment" class="px-4 py-2 bg-zinc-900 text-white text-xs font-semibold rounded-sm hover:bg-zinc-800 transition-colors">
-                                                Simulate Payment (@AppConfig.FormatPrice(order.Price) to Escrow)
+                                            <button type="button"
+                                                    @onclick="HandleSimulatePayment"
+                                                    disabled="@(_activeAction != null)"
+                                                    class="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-700 text-white text-xs font-semibold rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs">
+                                                @if (_activeAction == "pay")
+                                                {
+                                                    <svg class="animate-spin w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                    </svg>
+                                                    <span>Locking Funds in Escrow...</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>Simulate Payment (@AppConfig.FormatPrice(order.Price) to Escrow)</span>
+                                                }
                                             </button>
-                                            <button type="button" @onclick="HandleCancelOrder" class="px-3 py-2 border border-zinc-300 text-zinc-700 text-xs font-medium rounded-sm hover:bg-zinc-50 transition-colors">
-                                                Cancel Reservation
+
+                                            <button type="button"
+                                                    @onclick="HandleCancelOrder"
+                                                    disabled="@(_activeAction != null)"
+                                                    class="px-3 py-2 border border-zinc-300 text-zinc-700 text-xs font-medium rounded-sm hover:bg-zinc-50 transition-colors flex items-center gap-1.5 cursor-pointer">
+                                                @if (_activeAction == "cancel")
+                                                {
+                                                    <svg class="animate-spin w-3.5 h-3.5 text-zinc-700" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                    </svg>
+                                                    <span>Cancelling...</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>Cancel Reservation</span>
+                                                }
                                             </button>
-                                            <button type="button" @onclick="HandleSimulateExpireReservation" class="px-3 py-2 border border-dashed border-zinc-300 text-zinc-500 text-xs font-mono rounded-sm hover:text-zinc-900 hover:border-zinc-400">
-                                                ⚡ Fast-Forward Expire (Demo)
+
+                                            <button type="button"
+                                                    @onclick="HandleSimulateExpireReservation"
+                                                    disabled="@(_activeAction != null)"
+                                                    class="px-3 py-2 border border-dashed border-zinc-300 text-zinc-500 text-xs font-mono rounded-sm hover:text-zinc-900 hover:border-zinc-400 flex items-center gap-1 cursor-pointer">
+                                                @if (_activeAction == "expireReservation")
+                                                {
+                                                    <svg class="animate-spin w-3 h-3 text-zinc-600" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                    </svg>
+                                                    <span>Expiring...</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>⚡ Fast-Forward Expire (Demo)</span>
+                                                }
                                             </button>
                                         </div>
                                     </div>
@@ -179,18 +246,31 @@ else
                                     </p>
                                 }
                             }
-
-                            <!-- STATE: PAID (HELD) -->
                             else if (order.Status == OrderStatus.Paid)
                             {
+                                @* STATE: PAID (HELD) *@
                                 @if (isSeller)
                                 {
                                     <div class="space-y-3">
                                         <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-mono">
                                             ✓ Payment of @AppConfig.FormatPrice(order.Price) is secured in platform escrow. Safe to hand over or dispatch item.
                                         </div>
-                                        <button type="button" @onclick="HandleMarkHandedOver" class="px-4 py-2 bg-zinc-900 text-white text-xs font-semibold rounded-sm hover:bg-zinc-800 transition-colors">
-                                            Mark Handed Over / Shipped
+                                        <button type="button"
+                                                @onclick="HandleMarkHandedOver"
+                                                disabled="@(_activeAction != null)"
+                                                class="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-700 text-white text-xs font-semibold rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs">
+                                            @if (_activeAction == "ship")
+                                            {
+                                                <svg class="animate-spin w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                </svg>
+                                                <span>Updating Order Status...</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Mark Handed Over / Shipped</span>
+                                            }
                                         </button>
                                     </div>
                                 }
@@ -201,10 +281,9 @@ else
                                     </div>
                                 }
                             }
-
-                            <!-- STATE: HANDED OVER / SHIPPED (INSPECTION WINDOW) -->
                             else if (order.Status == OrderStatus.HandedOverOrShipped)
                             {
+                                @* STATE: HANDED OVER / SHIPPED (INSPECTION WINDOW) *@
                                 @if (isBuyer)
                                 {
                                     <div class="space-y-3">
@@ -212,14 +291,47 @@ else
                                             You have the item in your possession. Check each item against the verified condition report.
                                         </p>
                                         <div class="flex flex-wrap items-center gap-2">
-                                            <button type="button" @onclick="HandleConfirmInspection" class="px-4 py-2 bg-zinc-900 text-white text-xs font-semibold rounded-sm hover:bg-zinc-800 transition-colors">
-                                                Confirm Condition &amp; Release Funds to Seller
+                                            <button type="button"
+                                                    @onclick="HandleConfirmInspection"
+                                                    disabled="@(_activeAction != null)"
+                                                    class="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-700 text-white text-xs font-semibold rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs">
+                                                @if (_activeAction == "release")
+                                                {
+                                                    <svg class="animate-spin w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                    </svg>
+                                                    <span>Releasing Escrow Payout...</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>Confirm Condition &amp; Release Funds to Seller</span>
+                                                }
                                             </button>
-                                            <button type="button" @onclick="() => _showDisputeModal = true" class="px-3 py-2 border border-red-300 text-red-700 text-xs font-medium rounded-sm hover:bg-red-50 transition-colors">
+
+                                            <button type="button"
+                                                    @onclick="() => _showDisputeModal = true"
+                                                    disabled="@(_activeAction != null)"
+                                                    class="px-3 py-2 border border-red-300 text-red-700 text-xs font-medium rounded-sm hover:bg-red-50 transition-colors">
                                                 Open Dispute
                                             </button>
-                                            <button type="button" @onclick="HandleSimulateExpireInspection" class="px-3 py-2 border border-dashed border-zinc-300 text-zinc-500 text-xs font-mono rounded-sm hover:text-zinc-900 hover:border-zinc-400">
-                                                ⚡ Fast-Forward 48h (Auto-Release)
+
+                                            <button type="button"
+                                                    @onclick="HandleSimulateExpireInspection"
+                                                    disabled="@(_activeAction != null)"
+                                                    class="px-3 py-2 border border-dashed border-zinc-300 text-zinc-500 text-xs font-mono rounded-sm hover:text-zinc-900 hover:border-zinc-400 flex items-center gap-1">
+                                                @if (_activeAction == "expireInspection")
+                                                {
+                                                    <svg class="animate-spin w-3 h-3 text-zinc-600" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                    </svg>
+                                                    <span>Fast-Forwarding...</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>⚡ Fast-Forward 48h (Auto-Release)</span>
+                                                }
                                             </button>
                                         </div>
                                     </div>
@@ -230,16 +342,29 @@ else
                                         <p class="text-xs text-zinc-600 font-mono">
                                             The buyer is currently in the 48-hour inspection period. Funds will be released automatically if no dispute is filed.
                                         </p>
-                                        <button type="button" @onclick="HandleSimulateExpireInspection" class="px-3 py-1.5 border border-dashed border-zinc-300 text-zinc-500 text-xs font-mono rounded-sm hover:text-zinc-900">
-                                            ⚡ Fast-Forward 48h (Auto-Release Demo)
+                                        <button type="button"
+                                                @onclick="HandleSimulateExpireInspection"
+                                                disabled="@(_activeAction != null)"
+                                                class="px-3 py-1.5 border border-dashed border-zinc-300 text-zinc-500 text-xs font-mono rounded-sm hover:text-zinc-900 flex items-center gap-1">
+                                            @if (_activeAction == "expireInspection")
+                                            {
+                                                <svg class="animate-spin w-3 h-3 text-zinc-600" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                </svg>
+                                                <span>Fast-Forwarding...</span>
+                                            }
+                                            else
+                                            {
+                                                <span>⚡ Fast-Forward 48h (Auto-Release Demo)</span>
+                                            }
                                         </button>
                                     </div>
                                 }
                             }
-
-                            <!-- STATE: DISPUTED -->
                             else if (order.Status == OrderStatus.Disputed)
                             {
+                                @* STATE: DISPUTED *@
                                 <div class="bg-amber-50 border border-amber-300 rounded-sm p-4 space-y-2 text-xs">
                                     <div class="font-mono font-bold text-amber-950 uppercase">Active Dispute Under Review</div>
                                     @if (activeDispute != null)
@@ -255,10 +380,9 @@ else
                                     </p>
                                 </div>
                             }
-
-                            <!-- STATE: RESOLVED -->
                             else if (order.Status == OrderStatus.Resolved)
                             {
+                                @* STATE: RESOLVED *@
                                 <div class="bg-zinc-100 border border-zinc-300 rounded-sm p-4 text-xs space-y-1 font-mono">
                                     <div class="font-bold text-zinc-900">Dispute Resolved</div>
                                     @if (activeDispute != null)
@@ -272,10 +396,9 @@ else
                                     }
                                 </div>
                             }
-
-                            <!-- STATE: RELEASED (COMPLETED ESCROW) -->
                             else if (order.Status == OrderStatus.Released)
                             {
+                                @* STATE: RELEASED (COMPLETED ESCROW) *@
                                 <div class="p-3 bg-zinc-100 border border-zinc-200 rounded-sm text-xs font-mono text-zinc-800">
                                     ✓ Escrow transaction concluded successfully. Funds released to seller on @order.ReleasedDate?.ToString("MMM dd, yyyy").
                                 </div>
@@ -319,8 +442,19 @@ else
                                             <span class="text-zinc-600 text-xs font-bold ml-1">@_newReviewRating / 5</span>
                                         </div>
                                         <textarea rows="2" @bind="_newReviewComment" placeholder="Write an honest comment regarding condition accuracy and handover promptness..." class="w-full bg-white border border-zinc-200 rounded-sm p-2 text-xs text-zinc-800"></textarea>
-                                        <button type="button" @onclick="HandleSubmitReview" class="px-4 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-sm hover:bg-zinc-800 transition-colors">
-                                            Submit Review
+                                        <button type="button" @onclick="HandleSubmitReview" disabled="@(_activeAction == "review")" class="px-4 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-sm hover:bg-zinc-800 disabled:bg-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer">
+                                            @if (_activeAction == "review")
+                                            {
+                                                <svg class="animate-spin w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                                </svg>
+                                                <span>Submitting...</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Submit Review</span>
+                                            }
                                         </button>
                                     </div>
                                 }
@@ -360,9 +494,20 @@ else
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100">
-                    <button type="button" @onclick="() => _showDisputeModal = false" class="px-3 py-1.5 border border-zinc-200 text-xs rounded-sm">Cancel</button>
-                    <button type="button" @onclick="HandleSubmitDispute" class="px-4 py-1.5 bg-red-700 text-white text-xs font-semibold rounded-sm hover:bg-red-800 transition-colors">
-                        Submit Dispute &amp; Freeze Escrow
+                    <button type="button" @onclick="() => _showDisputeModal = false" disabled="@(_activeAction == "dispute")" class="px-3 py-1.5 border border-zinc-200 text-xs rounded-sm">Cancel</button>
+                    <button type="button" @onclick="HandleSubmitDispute" disabled="@(_activeAction == "dispute")" class="px-4 py-1.5 bg-red-700 hover:bg-red-800 disabled:bg-red-900 text-white text-xs font-semibold rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer">
+                        @if (_activeAction == "dispute")
+                        {
+                            <svg class="animate-spin w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                            </svg>
+                            <span>Freezing Escrow...</span>
+                        }
+                        else
+                        {
+                            <span>Submit Dispute &amp; Freeze Escrow</span>
+                        }
                     </button>
                 </div>
             </div>
@@ -442,91 +587,229 @@ else
         StateHasChanged();
     }
 
-    private void HandleSimulatePayment()
+    private string? _activeAction = null;
+
+    private async Task HandleSimulatePayment()
     {
         if (_selectedOrder == null) return;
+        _activeAction = "pay";
+        _feedbackMessage = null;
+        StateHasChanged();
+
+        await Task.Delay(250);
+
         var result = OrderService.SimulatePayment(_selectedOrder.Id, CurrentUserService.UserId);
+        _activeAction = null;
         _isError = !result.Success;
         _feedbackMessage = result.Message;
+
+        if (result.Success)
+        {
+            ToastService.ShowSuccess(result.Message, "Payment Secured in Escrow");
+        }
+        else
+        {
+            ToastService.ShowError(result.Message, "Payment Failed");
+        }
+
         LoadOrders();
     }
 
-    private void HandleCancelOrder()
+    private async Task HandleCancelOrder()
     {
         if (_selectedOrder == null) return;
+        _activeAction = "cancel";
+        _feedbackMessage = null;
+        StateHasChanged();
+
+        await Task.Delay(200);
+
         var result = OrderService.CancelOrder(_selectedOrder.Id, CurrentUserService.UserId);
+        _activeAction = null;
         _isError = !result.Success;
         _feedbackMessage = result.Message;
+
+        if (result.Success)
+        {
+            ToastService.ShowInfo(result.Message, "Reservation Cancelled");
+        }
+        else
+        {
+            ToastService.ShowError(result.Message, "Action Failed");
+        }
+
         LoadOrders();
     }
 
-    private void HandleMarkHandedOver()
+    private async Task HandleMarkHandedOver()
     {
         if (_selectedOrder == null) return;
+        _activeAction = "ship";
+        _feedbackMessage = null;
+        StateHasChanged();
+
+        await Task.Delay(250);
+
         var result = OrderService.MarkHandedOverOrShipped(_selectedOrder.Id, CurrentUserService.UserId);
+        _activeAction = null;
         _isError = !result.Success;
         _feedbackMessage = result.Message;
+
+        if (result.Success)
+        {
+            ToastService.ShowSuccess(result.Message, "Handover Initiated");
+        }
+        else
+        {
+            ToastService.ShowError(result.Message, "Action Failed");
+        }
+
         LoadOrders();
     }
 
-    private void HandleConfirmInspection()
+    private async Task HandleConfirmInspection()
     {
         if (_selectedOrder == null) return;
+        _activeAction = "release";
+        _feedbackMessage = null;
+        StateHasChanged();
+
+        await Task.Delay(250);
+
         var result = OrderService.ConfirmInspection(_selectedOrder.Id, CurrentUserService.UserId);
+        _activeAction = null;
         _isError = !result.Success;
         _feedbackMessage = result.Message;
+
+        if (result.Success)
+        {
+            ToastService.ShowSuccess(result.Message, "Escrow Funds Released");
+        }
+        else
+        {
+            ToastService.ShowError(result.Message, "Action Failed");
+        }
+
         LoadOrders();
     }
 
-    private void HandleSimulateExpireInspection()
+    private async Task HandleSimulateExpireInspection()
     {
         if (_selectedOrder == null) return;
+        _activeAction = "expireInspection";
+        _feedbackMessage = null;
+        StateHasChanged();
+
+        await Task.Delay(200);
+
         var result = OrderService.SimulateExpireInspectionWindow(_selectedOrder.Id);
+        _activeAction = null;
         _isError = !result.Success;
         _feedbackMessage = result.Message;
+
+        if (result.Success)
+        {
+            ToastService.ShowInfo(result.Message, "Inspection Window Expired");
+        }
+        else
+        {
+            ToastService.ShowError(result.Message);
+        }
+
         LoadOrders();
     }
 
-    private void HandleSimulateExpireReservation()
+    private async Task HandleSimulateExpireReservation()
     {
         if (_selectedOrder == null) return;
+        _activeAction = "expireReservation";
+        _feedbackMessage = null;
+        StateHasChanged();
+
+        await Task.Delay(200);
+
         var result = OrderService.SimulateExpireReservationWindow(_selectedOrder.Id);
+        _activeAction = null;
         _isError = !result.Success;
         _feedbackMessage = result.Message;
+
+        if (result.Success)
+        {
+            ToastService.ShowWarning(result.Message, "Reservation Expired");
+        }
+        else
+        {
+            ToastService.ShowError(result.Message);
+        }
+
         LoadOrders();
     }
 
-    private void HandleSubmitDispute()
+    private async Task HandleSubmitDispute()
     {
         if (_selectedOrder == null) return;
         if (string.IsNullOrWhiteSpace(_disputeReason) || string.IsNullOrWhiteSpace(_disputeEvidenceNotes))
         {
             _isError = true;
             _feedbackMessage = "Please provide both a reason and evidence notes.";
+            ToastService.ShowWarning("Please provide both a reason and evidence notes.", "Missing Fields");
             return;
         }
 
+        _activeAction = "dispute";
+        StateHasChanged();
+
+        await Task.Delay(250);
+
         var result = DisputeService.OpenDispute(_selectedOrder.Id, CurrentUserService.UserId, _disputeReason, _disputeEvidenceNotes);
+        _activeAction = null;
         _showDisputeModal = false;
         _isError = !result.Success;
         _feedbackMessage = result.Message;
+
+        if (result.Success)
+        {
+            ToastService.ShowWarning(result.Message, "Dispute Opened");
+        }
+        else
+        {
+            ToastService.ShowError(result.Message, "Dispute Failed");
+        }
+
         LoadOrders();
     }
 
-    private void HandleSubmitReview()
+    private async Task HandleSubmitReview()
     {
         if (_selectedOrder == null) return;
         if (string.IsNullOrWhiteSpace(_newReviewComment))
         {
             _isError = true;
             _feedbackMessage = "Please enter a comment for your review.";
+            ToastService.ShowWarning("Please enter a comment for your review.", "Comment Required");
             return;
         }
 
+        _activeAction = "review";
+        StateHasChanged();
+
+        await Task.Delay(250);
+
         var result = OrderService.SubmitReview(_selectedOrder.Id, CurrentUserService.UserId, _newReviewRating, _newReviewComment);
+        _activeAction = null;
         _isError = !result.Success;
         _feedbackMessage = result.Message;
         _newReviewComment = string.Empty;
+
+        if (result.Success)
+        {
+            ToastService.ShowSuccess(result.Message, "Review Published");
+        }
+        else
+        {
+            ToastService.ShowError(result.Message, "Review Failed");
+        }
+
         LoadOrders();
     }
 

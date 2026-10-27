@@ -11,6 +11,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(options =>
+{
+    options.MaximumReceiveMessageSize = 10 * 1024 * 1024; // 10MB for image uploads
+});
+
 // Cookie Authentication (14-day persistent sliding expiration)
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -41,6 +46,7 @@ builder.Services.AddScoped<IOfferService, OfferService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IDisputeService, DisputeService>();
 builder.Services.AddScoped<IReputationService, ReputationService>();
+builder.Services.AddScoped<IToastService, ToastService>();
 
 var app = builder.Build();
 

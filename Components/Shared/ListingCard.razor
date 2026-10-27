@@ -3,16 +3,16 @@
 @inject IUserService UserService
 
 <a href="/listing/@Listing.Id" class="group block border border-zinc-200 bg-white hover:border-zinc-400 transition-colors duration-150 rounded-md overflow-hidden flex flex-col h-full @CustomClass">
-    <!-- Image block: Neutral gray block with simple monogram or category label -->
-    <div class="relative bg-zinc-100 aspect-[4/3] w-full flex flex-col items-center justify-center border-b border-zinc-200 p-4">
+    <!-- Image block: Display real photo if available, or architectural monogram fallback -->
+    <div class="relative bg-zinc-100 w-full flex flex-col items-center justify-center border-b border-zinc-200 overflow-hidden" style="height: 190px; width: 100%;">
         <!-- Grade badge in top-left -->
-        <div class="absolute top-2.5 left-2.5">
+        <div class="absolute top-2.5 left-2.5 z-10">
             <GradeBadge Grade="@Listing.Grade" />
         </div>
 
         @if (Listing.Status == ListingStatus.Reserved)
         {
-            <div class="absolute top-2.5 right-2.5">
+            <div class="absolute top-2.5 right-2.5 z-10">
                 <span class="text-[10px] uppercase tracking-wider bg-zinc-900 text-white px-2 py-0.5 rounded-md font-medium">
                     Reserved
                 </span>
@@ -20,26 +20,33 @@
         }
         else if (Listing.Status == ListingStatus.Sold)
         {
-            <div class="absolute top-2.5 right-2.5">
+            <div class="absolute top-2.5 right-2.5 z-10">
                 <span class="text-[10px] uppercase tracking-wider bg-zinc-400 text-white px-2 py-0.5 rounded-md font-medium">
                     Sold
                 </span>
             </div>
         }
 
-        <!-- Neutral architectural monogram / category code -->
-        <div class="flex flex-col items-center justify-center text-zinc-400 group-hover:text-zinc-600 transition-colors">
-            <span class="font-mono text-2xl font-bold tracking-widest uppercase">
-                @CategoryShortCode
-            </span>
-            <span class="text-[10px] tracking-wider uppercase text-zinc-400 mt-1 font-medium">
-                @Listing.Brand
-            </span>
-        </div>
+        @if (!string.IsNullOrEmpty(PrimaryPhotoUrl))
+        {
+            <img src="@PrimaryPhotoUrl" alt="@Listing.Title" class="group-hover:scale-105 transition-transform duration-200" style="width: 100%; height: 100%; object-fit: cover; object-position: center;" />
+        }
+        else
+        {
+            <!-- Neutral architectural monogram / category code -->
+            <div class="flex flex-col items-center justify-center text-zinc-400 group-hover:text-zinc-600 transition-colors p-4">
+                <span class="font-mono text-2xl font-bold tracking-widest uppercase">
+                    @CategoryShortCode
+                </span>
+                <span class="text-[10px] tracking-wider uppercase text-zinc-400 mt-1 font-medium">
+                    @Listing.Brand
+                </span>
+            </div>
+        }
 
         @if (Listing.WarrantyOffered.HasValue && Listing.WarrantyOffered.Value > 0)
         {
-            <div class="absolute bottom-2.5 left-2.5">
+            <div class="absolute bottom-2.5 left-2.5 z-10">
                 <span class="text-[10px] text-zinc-600 bg-white/90 border border-zinc-200 px-1.5 py-0.5 rounded-md">
                     @(Listing.WarrantyOffered.Value)d warranty
                 </span>
@@ -85,6 +92,13 @@
     [Parameter] public string? CustomClass { get; set; }
 
     private User? Seller => UserService.GetUserById(Listing.SellerId);
+
+    private string? PrimaryPhotoUrl => Listing.Photos?.FirstOrDefault(p =>
+        !string.IsNullOrWhiteSpace(p) &&
+        (p.StartsWith("data:image", StringComparison.OrdinalIgnoreCase) ||
+         p.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+         p.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+         p.StartsWith("/", StringComparison.OrdinalIgnoreCase)));
 
     private string CategoryShortCode => Listing.Category switch
     {

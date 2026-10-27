@@ -7,6 +7,7 @@
 @inject IUserService UserService
 @inject ICurrentUserService CurrentUserService
 @inject NavigationManager NavigationManager
+@inject IToastService ToastService
 
 <PageTitle>@(_listing?.Title ?? "Listing Details") | @AppConfig.AppName</PageTitle>
 
@@ -28,15 +29,6 @@ else
         <span>/</span>
         <span class="text-zinc-900 truncate max-w-xs">@_listing.Title</span>
     </nav>
-
-    <!-- Feedback Message -->
-    @if (!string.IsNullOrWhiteSpace(_feedbackMessage))
-    {
-        <div class="mb-4 p-3 rounded-sm border text-xs font-mono flex items-center justify-between @(_isError ? "bg-red-50 text-red-900 border-red-200" : "bg-zinc-100 text-zinc-900 border-zinc-300")">
-            <span>@_feedbackMessage</span>
-            <button type="button" @onclick="() => _feedbackMessage = null" class="text-xs font-bold px-1">✕</button>
-        </div>
-    }
 
     <!-- Status Notice if not Active -->
     @if (_listing.Status == ListingStatus.Reserved)
@@ -64,29 +56,73 @@ else
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <!-- Left 7 columns: Visuals, Condition Checklist, Specs, Description -->
         <div class="lg:col-span-7 space-y-6">
-            <!-- Visual Hero Slot -->
-            <div class="relative bg-zinc-100 aspect-[16/10] w-full rounded-sm border border-zinc-200 flex flex-col items-center justify-center p-6">
-                <div class="absolute top-4 left-4">
-                    <GradeBadge Grade="@_listing.Grade" ShowDescription="true" />
-                </div>
+            <!-- Visual Hero Slot with Perfect Image Scaling -->
+            <div class="space-y-3">
+                <div class="relative bg-zinc-950 rounded-sm border border-zinc-200 overflow-hidden flex items-center justify-center shadow-xs" style="width: 100%; height: 420px; max-height: 65vh;">
+                    <div class="absolute top-4 left-4 z-10">
+                        <GradeBadge Grade="@_listing.Grade" ShowDescription="true" />
+                    </div>
 
-                <div class="flex flex-col items-center justify-center text-zinc-400">
-                    <span class="font-mono text-4xl font-bold tracking-widest uppercase">
-                        @_listing.Category.ToString()[..Math.Min(4, _listing.Category.ToString().Length)].ToUpperInvariant()
-                    </span>
-                    <span class="font-mono text-xs uppercase tracking-wider text-zinc-400 mt-2">
-                        @_listing.Brand Hardware Verification
-                    </span>
-                </div>
-
-                <div class="absolute bottom-4 right-4 flex items-center gap-2">
-                    @if (!string.IsNullOrWhiteSpace(_listing.SerialNumber))
+                    @if (DisplayablePhotos.Count > 0)
                     {
-                        <span class="font-mono text-[11px] text-zinc-500 bg-white/90 border border-zinc-200 px-2 py-0.5 rounded-sm tabular-nums">
-                            SN: @_listing.SerialNumber
-                        </span>
+                        var activePhoto = DisplayablePhotos[Math.Clamp(_selectedPhotoIndex, 0, DisplayablePhotos.Count - 1)];
+                        <img src="@activePhoto"
+                             alt="@_listing.Title"
+                             class="select-none cursor-pointer"
+                             style="width: 100%; height: 100%; object-fit: @(_isCoverFit ? "cover" : "contain"); object-position: center;"
+                             @onclick="() => _showZoomModal = true"
+                             title="Click to view full screen" />
+
+                        <!-- Image Control Buttons (Fit/Fill toggle + Zoom) -->
+                        <div class="absolute top-4 right-4 z-10 flex items-center gap-1.5 bg-black/60 backdrop-blur-xs px-2 py-1 rounded-sm border border-white/15 text-white text-[11px] font-mono shadow-xs">
+                            <button type="button" @onclick="() => _isCoverFit = !_isCoverFit" class="hover:text-zinc-200 transition-colors" title="@(_isCoverFit ? "Switch to Fit (show entire item)" : "Switch to Fill frame")">
+                                @(_isCoverFit ? "Mode: Fill" : "Mode: Fit")
+                            </button>
+                            <span class="text-white/30">|</span>
+                            <button type="button" @onclick="() => _showZoomModal = true" class="hover:text-zinc-200 transition-colors flex items-center gap-1" title="Fullscreen zoom">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                                </svg>
+                                <span>Zoom</span>
+                            </button>
+                        </div>
                     }
+                    else
+                    {
+                        <div class="flex flex-col items-center justify-center text-zinc-400 p-6">
+                            <span class="font-mono text-4xl font-bold tracking-widest uppercase">
+                                @_listing.Category.ToString()[..Math.Min(4, _listing.Category.ToString().Length)].ToUpperInvariant()
+                            </span>
+                            <span class="font-mono text-xs uppercase tracking-wider text-zinc-400 mt-2">
+                                @_listing.Brand Hardware Verification
+                            </span>
+                        </div>
+                    }
+
+                    <div class="absolute bottom-4 right-4 flex items-center gap-2 z-10">
+                        @if (!string.IsNullOrWhiteSpace(_listing.SerialNumber))
+                        {
+                            <span class="font-mono text-[11px] text-zinc-700 bg-white/95 border border-zinc-200 px-2 py-0.5 rounded-sm tabular-nums shadow-xs">
+                                SN: @_listing.SerialNumber
+                            </span>
+                        }
+                    </div>
                 </div>
+
+                @if (DisplayablePhotos.Count > 1)
+                {
+                    <div class="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
+                        @for (int i = 0; i < DisplayablePhotos.Count; i++)
+                        {
+                            var idx = i;
+                            var photo = DisplayablePhotos[idx];
+                            var isSelected = idx == _selectedPhotoIndex;
+                            <button type="button" @onclick="() => _selectedPhotoIndex = idx" class="relative w-16 h-16 rounded-sm border-2 overflow-hidden flex-shrink-0 transition-all @(isSelected ? "border-zinc-900 ring-2 ring-zinc-900/20 shadow-xs" : "border-zinc-200 hover:border-zinc-400 opacity-75 hover:opacity-100")">
+                                <img src="@photo" alt="Thumbnail @(idx + 1)" style="width: 100%; height: 100%; object-fit: cover; object-position: center;" />
+                            </button>
+                        }
+                    </div>
+                }
             </div>
 
             <!-- Description -->
@@ -211,11 +247,37 @@ else
                             </div>
                         </div>
 
-                        <!-- Buy Now Button -->
-                        <button type="button" @onclick="HandleBuyNow" class="w-full py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold rounded-sm transition-colors flex items-center justify-center gap-2">
-                            <span>Buy Now &amp; Reserve (24h)</span>
-                            <span class="font-mono tabular-nums opacity-90">@AppConfig.FormatPrice(_listing.Price)</span>
+                        <!-- Buy Now Button with Tactile & Loading Feedback -->
+                        <button type="button"
+                                @onclick="HandleBuyNow"
+                                disabled="@_isBuying"
+                                class="w-full py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-700 text-white text-xs font-semibold rounded-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs">
+                            @if (_isBuying)
+                            {
+                                <svg class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                </svg>
+                                <span>Securing Reservation (24h)...</span>
+                            }
+                            else
+                            {
+                                <span>Buy Now &amp; Reserve (24h)</span>
+                                <span class="font-mono tabular-nums opacity-90">@AppConfig.FormatPrice(_listing.Price)</span>
+                            }
                         </button>
+
+                        @if (_isError && !string.IsNullOrWhiteSpace(_feedbackMessage))
+                        {
+                            <div class="p-2.5 bg-red-50 border border-red-200 text-red-800 text-xs rounded-sm flex items-start gap-2 animate-in">
+                                <svg class="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <circle cx="12" cy="12" r="10" stroke-width="2"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12" stroke-width="2"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16" stroke-width="2"></line>
+                                </svg>
+                                <span class="flex-1 font-medium">@_feedbackMessage</span>
+                            </div>
+                        }
 
                         <!-- Make an Offer button if allowed -->
                         @if (_listing.AllowsOffers)
@@ -299,8 +361,42 @@ else
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100">
-                    <button type="button" @onclick="() => _showOfferModal = false" class="px-3 py-1.5 border border-zinc-200 text-xs rounded-sm">Cancel</button>
-                    <button type="button" @onclick="SubmitOffer" class="px-3 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-sm">Submit Offer</button>
+                    <button type="button" @onclick="() => _showOfferModal = false" disabled="@_isSubmittingOffer" class="px-3 py-1.5 border border-zinc-200 text-xs rounded-sm">Cancel</button>
+                    <button type="button" @onclick="SubmitOffer" disabled="@_isSubmittingOffer" class="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-600 text-white text-xs font-medium rounded-sm flex items-center gap-1.5">
+                        @if (_isSubmittingOffer)
+                        {
+                            <svg class="animate-spin w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                            </svg>
+                            <span>Submitting...</span>
+                        }
+                        else
+                        {
+                            <span>Submit Offer</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Fullscreen Zoom Lightbox Modal -->
+    @if (_showZoomModal && DisplayablePhotos.Count > 0)
+    {
+        var activePhoto = DisplayablePhotos[Math.Clamp(_selectedPhotoIndex, 0, DisplayablePhotos.Count - 1)];
+        <div class="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 select-none" @onclick="() => _showZoomModal = false">
+            <div class="relative max-w-5xl max-h-[92vh] w-full flex flex-col items-center justify-center" @onclick:stopPropagation>
+                <div class="w-full flex items-center justify-between text-white pb-3 px-2">
+                    <span class="text-xs font-mono text-zinc-400">Photo @(_selectedPhotoIndex + 1) of @DisplayablePhotos.Count — @_listing?.Title</span>
+                    <button type="button" @onclick="() => _showZoomModal = false" class="p-1.5 text-zinc-400 hover:text-white transition-colors" title="Close (ESC)">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="relative flex items-center justify-center w-full max-h-[82vh] overflow-hidden">
+                    <img src="@activePhoto" alt="@_listing?.Title" class="max-w-full max-h-[82vh] rounded-xs shadow-2xl" style="object-fit: contain;" />
                 </div>
             </div>
         </div>
@@ -318,8 +414,21 @@ else
     private string? _feedbackMessage;
     private bool _isError;
     private bool _isEditing = false;
-
+    private bool _isCoverFit = false;
+    private bool _showZoomModal = false;
+    private bool _isBuying = false;
+    private bool _isSubmittingOffer = false;
+    private bool _isSaving = false;
     private bool IsCurrentSeller => CurrentUserService.IsSignedIn && _listing != null && _listing.SellerId == CurrentUserService.UserId;
+
+    private int _selectedPhotoIndex = 0;
+    private List<string> DisplayablePhotos => _listing?.Photos?
+        .Where(p => !string.IsNullOrWhiteSpace(p) &&
+            (p.StartsWith("data:image", StringComparison.OrdinalIgnoreCase) ||
+             p.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+             p.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+             p.StartsWith("/", StringComparison.OrdinalIgnoreCase)))
+        .ToList() ?? new List<string>();
 
     protected override void OnInitialized()
     {
@@ -347,38 +456,69 @@ else
         }
     }
 
-    private void HandleBuyNow()
+    private async Task HandleBuyNow()
     {
         if (!CurrentUserService.IsSignedIn)
         {
+            ToastService.ShowInfo("Please sign in to buy and reserve this item.", "Sign In Required");
             NavigationManager.NavigateTo($"/login?returnUrl=/listing/{_listing!.Id}");
             return;
         }
 
+        _isBuying = true;
+        _feedbackMessage = null;
+        _isError = false;
+        StateHasChanged();
+
+        await Task.Delay(250); // Tactile responsiveness cue
+
         var result = OrderService.CreateOrderReservation(_listing!.Id, CurrentUserService.UserId, _selectedDeliveryMethod);
+        _isBuying = false;
+
         if (result.Success && result.Order != null)
         {
+            ToastService.ShowSuccess("Order reservation created! Directing to escrow dashboard...", "Item Reserved");
             NavigationManager.NavigateTo("/my/orders");
         }
         else
         {
             _isError = true;
             _feedbackMessage = result.Message;
+            ToastService.ShowError(result.Message, "Cannot Reserve Item");
+            StateHasChanged();
         }
     }
 
-    private void SubmitOffer()
+    private async Task SubmitOffer()
     {
         if (!CurrentUserService.IsSignedIn)
         {
+            ToastService.ShowInfo("Please sign in to submit an offer.", "Sign In Required");
             NavigationManager.NavigateTo($"/login?returnUrl=/listing/{_listing!.Id}");
             return;
         }
 
+        _isSubmittingOffer = true;
+        StateHasChanged();
+
+        await Task.Delay(250);
+
         var result = OfferService.CreateOffer(_listing!.Id, CurrentUserService.UserId, _offerAmount);
+        _isSubmittingOffer = false;
         _showOfferModal = false;
         _isError = !result.Success;
         _feedbackMessage = result.Message;
+
+        if (result.Success)
+        {
+            ToastService.ShowSuccess(result.Message, "Offer Sent to Seller");
+        }
+        else
+        {
+            ToastService.ShowError(result.Message, "Offer Failed");
+        }
+
+        StateHasChanged();
     }
 
     private void SaveEditedListing()
@@ -389,6 +529,7 @@ else
             _isEditing = false;
             _isError = false;
             _feedbackMessage = "Listing updated successfully.";
+            ToastService.ShowSuccess("Listing updated successfully.", "Saved");
         }
     }
 
@@ -399,12 +540,14 @@ else
             var success = ListingService.RemoveListing(_listing.Id, CurrentUserService.UserId);
             if (success)
             {
+                ToastService.ShowInfo("Listing removed from the marketplace.", "Listing Removed");
                 NavigationManager.NavigateTo("/my/listings");
             }
             else
             {
                 _isError = true;
                 _feedbackMessage = "Unable to remove listing.";
+                ToastService.ShowError("Unable to remove listing.", "Action Failed");
             }
         }
     }

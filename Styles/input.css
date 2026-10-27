@@ -49,3 +49,24 @@ body {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Image scaling and object-fit utilities */
+.object-contain {
+  object-fit: contain !important;
+}
+
+.object-cover {
+  object-fit: cover !important;
+}
+
+.object-fill {
+  object-fit: fill !important;
+}
+
+.object-scale-down {
+  object-fit: scale-down !important;
+}
+
+.object-center {
+  object-position: center !important;
+}

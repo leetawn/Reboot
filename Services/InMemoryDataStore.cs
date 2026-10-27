@@ -20,9 +20,6 @@ public class InMemoryDataStore : IMarketplaceDataStore
 
     private void SeedData()
     {
-        // ---------------------------------------------------------------------
-        // 1. Users (6 Users: 1 Admin, 3 Verified Sellers, 1 Buyer, 1 Unverified New User)
-        // ---------------------------------------------------------------------
         var defaultHash = PasswordHasher.HashPassword("Password123!");
 
         var admin = new User
