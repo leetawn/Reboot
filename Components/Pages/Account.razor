@@ -71,7 +71,7 @@ else
             @if (!user.IsVerified)
             {
                 <button type="button"
-                        @onclick="HandleSimulateVerification"
+                        @onclick="HandleVerifyIdentity"
                         disabled="@_isVerifying"
                         class="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-700 text-white text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 flex-shrink-0 cursor-pointer shadow-xs">
                     @if (_isVerifying)
@@ -281,7 +281,7 @@ else
         }
     }
 
-    private async Task HandleSimulateVerification()
+    private async Task HandleVerifyIdentity()
     {
         _isVerifying = true;
         StateHasChanged();

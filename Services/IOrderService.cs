@@ -11,7 +11,7 @@ public interface IOrderService
     IReadOnlyList<Order> GetAllOrdersAdmin();
 
     (bool Success, string Message, Order? Order) CreateOrderReservation(Guid listingId, string buyerId, DeliveryMethod deliveryMethod);
-    (bool Success, string Message) SimulatePayment(Guid orderId, string buyerId);
+    (bool Success, string Message) ConfirmPayment(Guid orderId, string buyerId);
     (bool Success, string Message) MarkHandedOverOrShipped(Guid orderId, string sellerId);
     (bool Success, string Message) ConfirmInspection(Guid orderId, string buyerId);
     (bool Success, string Message) CancelOrder(Guid orderId, string userId);
@@ -25,7 +25,7 @@ public interface IOrderService
     (bool Success, string Message) AddOrderMessage(Guid orderId, string senderId, string message);
     (bool Success, string Message) ClaimUnresponsiveSellerRefund(Guid orderId, string buyerId);
 
-    // Fast-forward demo helpers
+    // Admin-only timer override helpers
     (bool Success, string Message) SimulateExpireInspectionWindow(Guid orderId);
     (bool Success, string Message) SimulateExpireReservationWindow(Guid orderId);
     (bool Success, string Message) SimulateExpireDispatchWindow(Guid orderId);

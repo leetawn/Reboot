@@ -123,9 +123,9 @@ public class OrderService : IOrderService
 
     /// <summary>
     /// Escrow Step 2: Paid (held)
-    /// Simulated payment held securely by platform escrow.
+    /// Buyer confirms payment, which is held securely by platform escrow.
     /// </summary>
-    public (bool Success, string Message) SimulatePayment(Guid orderId, string buyerId)
+    public (bool Success, string Message) ConfirmPayment(Guid orderId, string buyerId)
     {
         lock (_dataStore.SyncRoot)
         {

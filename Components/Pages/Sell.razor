@@ -50,7 +50,7 @@ else if (!CurrentUserService.IsVerified)
             <br />Status: <span class="text-red-700 font-semibold">Not Verified</span>
         </div>
 
-        @if (_isSimulatingVerification)
+        @if (_isVerifyingIdentity)
         {
             <div class="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-mono flex items-center gap-2">
                 <svg class="animate-spin w-4 h-4 text-emerald-700" fill="none" viewBox="0 0 24 24">
@@ -62,7 +62,7 @@ else if (!CurrentUserService.IsVerified)
         }
         else
         {
-            <button type="button" @onclick="SimulateVerifyAccount" class="w-full py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-sm transition-colors cursor-pointer shadow-xs">
+            <button type="button" @onclick="HandleVerifyIdentity" class="w-full py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-sm transition-colors cursor-pointer shadow-xs">
                 Submit Identity Verification (Verify My Account)
             </button>
         }
@@ -465,7 +465,7 @@ else
 @code {
     private Listing _listing = new();
     private int _selectedWarrantyDays = 7;
-    private bool _isSimulatingVerification = false;
+    private bool _isVerifyingIdentity = false;
     private bool _showValidationModal = false;
     private List<string> _validationErrors = new();
     private bool _isUploadingPhotos = false;
@@ -506,17 +506,17 @@ else
         }
     }
 
-    private async Task SimulateVerifyAccount()
+    private async Task HandleVerifyIdentity()
     {
         if (CurrentUserService.CurrentUser != null)
         {
-            _isSimulatingVerification = true;
+            _isVerifyingIdentity = true;
             StateHasChanged();
             await Task.Delay(350);
 
             UserService.VerifyUser(CurrentUserService.UserId);
             CurrentUserService.CurrentUser.IsVerified = true;
-            _isSimulatingVerification = false;
+            _isVerifyingIdentity = false;
             ToastService.ShowSuccess("Identity verification submitted successfully! You can now publish listings.", "Account Verified");
             StateHasChanged();
         }
