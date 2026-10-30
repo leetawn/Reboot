@@ -1,6 +1,25 @@
-﻿<Router AppAssembly="typeof(Program).Assembly">
+<Router AppAssembly="typeof(Program).Assembly">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
+    <NotFound>
+        <LayoutView Layout="typeof(Layout.MainLayout)">
+            <div class="max-w-md mx-auto my-16 text-center bg-white border border-zinc-200 rounded-md p-8 sm:p-12 space-y-4 shadow-xs">
+                <span class="font-mono text-xs font-semibold uppercase tracking-wider text-zinc-400">404 Error</span>
+                <h1 class="text-2xl font-bold tracking-tight text-zinc-900">Page not found</h1>
+                <p class="text-xs text-zinc-600 leading-relaxed">
+                    The listing, order, or page you were looking for doesn't exist or has moved.
+                </p>
+                <div class="pt-2 flex items-center justify-center gap-3">
+                    <a href="/browse" class="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-md transition-colors">
+                        Browse Listings
+                    </a>
+                    <a href="/" class="px-4 py-2 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-700 text-xs font-medium rounded-md transition-colors">
+                        Return Home
+                    </a>
+                </div>
+            </div>
+        </LayoutView>
+    </NotFound>
 </Router>

@@ -132,7 +132,7 @@ public class OrderService : IOrderService
             var order = _dataStore.Orders.FirstOrDefault(o => o.Id == orderId);
             if (order == null) return (false, "Order not found.");
 
-            if (order.BuyerId != buyerId) return (false, "Only the buyer can simulate payment for this order.");
+            if (order.BuyerId != buyerId) return (false, "Only the buyer can submit payment for this order.");
 
             if (order.Status != OrderStatus.Reserved)
             {
@@ -148,8 +148,19 @@ public class OrderService : IOrderService
 
             order.Status = OrderStatus.Paid;
             order.PaidDate = DateTime.UtcNow;
+            order.DispatchDeadline = DateTime.UtcNow.AddHours(72); // 72-hour window for seller to dispatch
 
-            return (true, "Simulated payment held in escrow. Seller has been notified to hand over or ship the item.");
+            var buyer = _dataStore.Users.FirstOrDefault(u => u.Id == buyerId);
+            order.Messages.Add(new OrderMessage
+            {
+                SenderId = "system",
+                SenderName = "Reboot Escrow",
+                Content = $"Payment of {AppConfig.FormatPrice(order.Price)} confirmed and held in escrow. Seller has 72 hours to hand over or dispatch the item.",
+                Timestamp = DateTime.UtcNow,
+                IsSystem = true
+            });
+
+            return (true, "Payment secured in escrow. Seller has 72 hours to hand over or ship the item.");
         }
     }
 
@@ -313,10 +324,10 @@ public class OrderService : IOrderService
                 return (false, "Order is not currently in the inspection window.");
             }
 
-            // Fast-forward inspection deadline to 1 second ago
+            // Override inspection deadline to 1 second ago
             order.InspectionDeadline = DateTime.UtcNow.AddSeconds(-1);
             CheckOrderDeadlines(order);
-            return (true, "Simulated 48-hour inspection window expiration. Funds automatically released.");
+            return (true, "48-hour inspection window expired. Funds automatically released to seller.");
         }
     }
 
@@ -334,7 +345,229 @@ public class OrderService : IOrderService
 
             order.ReservedUntil = DateTime.UtcNow.AddSeconds(-1);
             CancelReservationInternal(order);
-            return (true, "Simulated 24-hour reservation window expiration. Listing returned to active.");
+            return (true, "24-hour reservation window expired. Listing returned to active.");
+        }
+    }
+
+    public (bool Success, string Message) ProposeMeetup(Guid orderId, string userId, string location, string? time, string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(location))
+        {
+            return (false, "Please specify a meetup location.");
+        }
+
+        lock (_dataStore.SyncRoot)
+        {
+            var order = _dataStore.Orders.FirstOrDefault(o => o.Id == orderId);
+            if (order == null) return (false, "Order not found.");
+
+            if (order.BuyerId != userId && order.SellerId != userId)
+            {
+                return (false, "Only parties to this order can coordinate meetup details.");
+            }
+
+            order.MeetupLocation = location.Trim();
+            order.MeetupTime = string.IsNullOrWhiteSpace(time) ? null : time.Trim();
+            order.MeetupNotes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+
+            bool isBuyer = order.BuyerId == userId;
+            order.MeetupConfirmedByBuyer = isBuyer;
+            order.MeetupConfirmedBySeller = !isBuyer;
+
+            var user = _dataStore.Users.FirstOrDefault(u => u.Id == userId);
+            var roleName = isBuyer ? "Buyer" : "Seller";
+            var timeDesc = !string.IsNullOrWhiteSpace(time) ? $" on {time.Trim()}" : "";
+            order.Messages.Add(new OrderMessage
+            {
+                SenderId = userId,
+                SenderName = user?.DisplayName ?? roleName,
+                Content = $"Proposed meetup at {location.Trim()}{timeDesc}. Awaiting counterparty confirmation.",
+                Timestamp = DateTime.UtcNow,
+                IsSystem = false
+            });
+
+            return (true, "Meetup details updated. Counterparty has been prompted to confirm.");
+        }
+    }
+
+    public (bool Success, string Message) ConfirmMeetup(Guid orderId, string userId)
+    {
+        lock (_dataStore.SyncRoot)
+        {
+            var order = _dataStore.Orders.FirstOrDefault(o => o.Id == orderId);
+            if (order == null) return (false, "Order not found.");
+
+            if (order.BuyerId != userId && order.SellerId != userId)
+            {
+                return (false, "Only parties to this order can confirm meetup details.");
+            }
+
+            if (string.IsNullOrWhiteSpace(order.MeetupLocation))
+            {
+                return (false, "No meetup location has been proposed yet.");
+            }
+
+            if (order.BuyerId == userId)
+            {
+                order.MeetupConfirmedByBuyer = true;
+            }
+            else
+            {
+                order.MeetupConfirmedBySeller = true;
+            }
+
+            var user = _dataStore.Users.FirstOrDefault(u => u.Id == userId);
+            var roleName = order.BuyerId == userId ? "Buyer" : "Seller";
+
+            if (order.IsMeetupAgreed)
+            {
+                order.Messages.Add(new OrderMessage
+                {
+                    SenderId = "system",
+                    SenderName = "Reboot Escrow",
+                    Content = $"Both buyer and seller have agreed to meet at: {order.MeetupLocation}{(string.IsNullOrWhiteSpace(order.MeetupTime) ? "" : $" ({order.MeetupTime})")}.",
+                    Timestamp = DateTime.UtcNow,
+                    IsSystem = true
+                });
+                return (true, $"Meetup location confirmed by both parties! Location: {order.MeetupLocation}.");
+            }
+            else
+            {
+                order.Messages.Add(new OrderMessage
+                {
+                    SenderId = userId,
+                    SenderName = user?.DisplayName ?? roleName,
+                    Content = $"Confirmed agreed meetup at {order.MeetupLocation}.",
+                    Timestamp = DateTime.UtcNow,
+                    IsSystem = false
+                });
+                return (true, "You confirmed the meetup spot. Awaiting counterparty confirmation.");
+            }
+        }
+    }
+
+    public (bool Success, string Message) UpdateShippingDetails(Guid orderId, string sellerId, string courierName, string trackingNumber)
+    {
+        lock (_dataStore.SyncRoot)
+        {
+            var order = _dataStore.Orders.FirstOrDefault(o => o.Id == orderId);
+            if (order == null) return (false, "Order not found.");
+
+            if (order.SellerId != sellerId)
+            {
+                return (false, "Only the seller can update shipping/tracking details.");
+            }
+
+            order.CourierName = courierName.Trim();
+            order.TrackingNumber = trackingNumber.Trim();
+
+            order.Messages.Add(new OrderMessage
+            {
+                SenderId = sellerId,
+                SenderName = "Seller",
+                Content = $"Shipping dispatch info updated: {courierName.Trim()} — Tracking #{trackingNumber.Trim()}.",
+                Timestamp = DateTime.UtcNow,
+                IsSystem = false
+            });
+
+            return (true, "Courier tracking details saved.");
+        }
+    }
+
+    public (bool Success, string Message) AddOrderMessage(Guid orderId, string senderId, string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return (false, "Message cannot be empty.");
+        }
+
+        lock (_dataStore.SyncRoot)
+        {
+            var order = _dataStore.Orders.FirstOrDefault(o => o.Id == orderId);
+            if (order == null) return (false, "Order not found.");
+
+            if (order.BuyerId != senderId && order.SellerId != senderId)
+            {
+                return (false, "Only parties to this order may post coordination notes.");
+            }
+
+            var user = _dataStore.Users.FirstOrDefault(u => u.Id == senderId);
+            var roleName = order.BuyerId == senderId ? "Buyer" : "Seller";
+
+            order.Messages.Add(new OrderMessage
+            {
+                SenderId = senderId,
+                SenderName = user?.DisplayName ?? roleName,
+                Content = message.Trim(),
+                Timestamp = DateTime.UtcNow,
+                IsSystem = false
+            });
+
+            return (true, "Message posted to order thread.");
+        }
+    }
+
+    public (bool Success, string Message) ClaimUnresponsiveSellerRefund(Guid orderId, string buyerId)
+    {
+        lock (_dataStore.SyncRoot)
+        {
+            var order = _dataStore.Orders.FirstOrDefault(o => o.Id == orderId);
+            if (order == null) return (false, "Order not found.");
+
+            if (order.BuyerId != buyerId)
+            {
+                return (false, "Only the buyer can request an unresponsive seller refund.");
+            }
+
+            if (order.Status != OrderStatus.Paid)
+            {
+                return (false, $"Cannot claim refund for order in status {order.Status}.");
+            }
+
+            if (!order.IsDispatchOverdue)
+            {
+                var remaining = order.DispatchDeadline.HasValue ? order.DispatchDeadline.Value - DateTime.UtcNow : TimeSpan.FromHours(72);
+                return (false, $"Seller dispatch deadline has not expired yet. {Math.Max(1, (int)remaining.TotalHours)} hours remaining.");
+            }
+
+            var now = DateTime.UtcNow;
+            order.Status = OrderStatus.Cancelled;
+            order.CancelledDate = now;
+
+            // Return listing to active
+            var listing = _dataStore.Listings.FirstOrDefault(l => l.Id == order.ListingId);
+            if (listing != null && listing.Status == ListingStatus.Reserved)
+            {
+                listing.Status = ListingStatus.Active;
+            }
+
+            order.Messages.Add(new OrderMessage
+            {
+                SenderId = "system",
+                SenderName = "Reboot Escrow",
+                Content = $"Seller did not hand over or dispatch within the 72-hour window. Order cancelled; 100% full refund ({AppConfig.FormatPrice(order.Price)}) returned to buyer.",
+                Timestamp = now,
+                IsSystem = true
+            });
+
+            return (true, $"72-hour seller dispatch deadline expired. Order cancelled and full refund of {AppConfig.FormatPrice(order.Price)} returned to your account.");
+        }
+    }
+
+    public (bool Success, string Message) SimulateExpireDispatchWindow(Guid orderId)
+    {
+        lock (_dataStore.SyncRoot)
+        {
+            var order = _dataStore.Orders.FirstOrDefault(o => o.Id == orderId);
+            if (order == null) return (false, "Order not found.");
+
+            if (order.Status != OrderStatus.Paid)
+            {
+                return (false, "Order is not in Paid status.");
+            }
+
+            order.DispatchDeadline = DateTime.UtcNow.AddSeconds(-1);
+            return (true, "72-hour dispatch window expired. Buyer can now claim an immediate refund.");
         }
     }
 

@@ -14,14 +14,16 @@
                        Name="firstName"
                        Label="First name"
                        Type="text"
+                       Value="@FirstName"
                        Required="true"
-                       AutoFocus="true"
+                       AutoFocus="@string.IsNullOrWhiteSpace(FirstName)"
                        Placeholder="First name" />
 
             <FormField Id="lastName"
                        Name="lastName"
                        Label="Last name"
                        Type="text"
+                       Value="@LastName"
                        Required="true"
                        Placeholder="Last name" />
         </div>
@@ -31,6 +33,7 @@
                    Name="email"
                    Label="Email address"
                    Type="email"
+                   Value="@Email"
                    Required="true"
                    Placeholder="name@example.com" />
 
@@ -43,13 +46,13 @@
                     name="city"
                     required
                     class="w-full px-3 py-2 text-sm bg-white border border-[#dadce0] rounded-md transition-colors outline-none focus:border-zinc-900 focus:ring-2 focus:ring-zinc-200 text-zinc-900">
-                <option value="Cebu City">Cebu City</option>
-                <option value="Mandaue City">Mandaue City</option>
-                <option value="Lapu-Lapu City">Lapu-Lapu City</option>
-                <option value="Talisay City">Talisay City</option>
-                <option value="Minglanilla">Minglanilla</option>
-                <option value="Consolacion">Consolacion</option>
-                <option value="Liloan">Liloan</option>
+                <option value="Cebu City" selected="@(City == null || City == "Cebu City")">Cebu City</option>
+                <option value="Mandaue City" selected="@(City == "Mandaue City")">Mandaue City</option>
+                <option value="Lapu-Lapu City" selected="@(City == "Lapu-Lapu City")">Lapu-Lapu City</option>
+                <option value="Talisay City" selected="@(City == "Talisay City")">Talisay City</option>
+                <option value="Minglanilla" selected="@(City == "Minglanilla")">Minglanilla</option>
+                <option value="Consolacion" selected="@(City == "Consolacion")">Consolacion</option>
+                <option value="Liloan" selected="@(City == "Liloan")">Liloan</option>
             </select>
         </div>
 
@@ -121,4 +124,8 @@
 
 @code {
     [SupplyParameterFromQuery] public string? Error { get; set; }
+    [SupplyParameterFromQuery] public string? FirstName { get; set; }
+    [SupplyParameterFromQuery] public string? LastName { get; set; }
+    [SupplyParameterFromQuery] public string? Email { get; set; }
+    [SupplyParameterFromQuery] public string? City { get; set; }
 }

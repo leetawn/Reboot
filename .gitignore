@@ -20,3 +20,7 @@ Thumbs.db
 ## Standalone binaries
 *.exe
 tailwindcss.exe
+
+## Temporary & scripts
+scratch/
+*.ps1

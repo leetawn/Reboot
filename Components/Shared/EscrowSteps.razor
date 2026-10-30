@@ -107,7 +107,7 @@
 
     private string StepExplanation => CurrentStatus switch
     {
-        OrderStatus.Reserved => "Buyer has 24 hours to simulate payment. If unpaid, the item automatically reopens to the public.",
+        OrderStatus.Reserved => "Buyer has 24 hours to complete payment. If unpaid, the item automatically reopens to the public.",
         OrderStatus.Paid => "Payment is securely held in platform escrow. The seller can safely hand over or ship the item.",
         OrderStatus.HandedOverOrShipped => "Item has been handed over / shipped. Buyer has 48 hours to inspect against the checklist. Funds release upon confirmation or window expiry.",
         OrderStatus.Confirmed => "Buyer confirmed the item condition. Platform is releasing payout to seller.",

@@ -17,14 +17,17 @@
     private System.Threading.Timer? _timer;
     private string FormattedTime = "—";
     private bool _hasExpiredNotified = false;
+    private bool _isDisposed = false;
 
     protected override void OnInitialized()
     {
         UpdateFormattedTime();
         _timer = new System.Threading.Timer(_ =>
         {
+            if (_isDisposed) return;
             InvokeAsync(() =>
             {
+                if (_isDisposed) return;
                 UpdateFormattedTime();
                 StateHasChanged();
             });
@@ -38,6 +41,7 @@
 
     private void UpdateFormattedTime()
     {
+        if (_isDisposed) return;
         if (!Deadline.HasValue)
         {
             FormattedTime = "No active timer";
@@ -68,6 +72,7 @@
 
     public void Dispose()
     {
+        _isDisposed = true;
         _timer?.Dispose();
     }
 }

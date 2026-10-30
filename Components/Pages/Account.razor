@@ -1,0 +1,299 @@
+@page "/account"
+@using Reboot.Models
+@using Reboot.Services
+@inject IUserService UserService
+@inject ICurrentUserService CurrentUserService
+@inject NavigationManager NavigationManager
+@inject IToastService ToastService
+
+<PageTitle>Account Settings | @AppConfig.AppName</PageTitle>
+
+@if (!CurrentUserService.IsSignedIn || CurrentUserService.CurrentUser == null)
+{
+    <div class="bg-white border border-zinc-200 rounded-md p-8 text-center max-w-md mx-auto my-12 space-y-4">
+        <h2 class="text-base font-bold text-zinc-900">Sign in required</h2>
+        <p class="text-xs text-zinc-600">You must be signed in to access your account settings.</p>
+        <a href="/login?returnUrl=/account" class="inline-block px-4 py-2 bg-zinc-900 text-white text-xs font-medium rounded-md hover:bg-zinc-800 transition-colors">
+            Sign in
+        </a>
+    </div>
+}
+else
+{
+    var user = CurrentUserService.CurrentUser;
+
+    <div class="max-w-3xl mx-auto space-y-8">
+        <!-- Top Page Header -->
+        <div class="border-b border-zinc-200 pb-5">
+            <h1 class="text-2xl font-bold tracking-tight text-zinc-900">Account settings</h1>
+            <p class="mt-1 text-xs text-zinc-500 font-mono">
+                Manage your profile, identity verification, security credentials, and Cebu trading preferences.
+            </p>
+        </div>
+
+        <!-- Identity Verification Status Banner -->
+        <div class="bg-white border @(user.IsVerified ? "border-emerald-200 bg-emerald-50/20" : "border-amber-200 bg-amber-50/20") rounded-md p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-full @(user.IsVerified ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800") flex items-center justify-center flex-shrink-0">
+                    @if (user.IsVerified)
+                    {
+                        <svg class="w-5 h-5 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                    }
+                    else
+                    {
+                        <svg class="w-5 h-5 stroke-current" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    }
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-sm font-bold text-zinc-900">
+                            @(user.IsVerified ? "Identity Verified" : "Identity Verification Pending")
+                        </h3>
+                        @if (user.IsAdmin)
+                        {
+                            <span class="text-[9px] font-mono uppercase bg-zinc-900 text-white px-1.5 py-0.5 rounded font-bold">Admin</span>
+                        }
+                    </div>
+                    <p class="text-xs text-zinc-600 mt-0.5">
+                        @(user.IsVerified
+                            ? "Your identity is verified. You have full privileges to list items and participate in escrow transactions."
+                            : "Unverified accounts can browse and purchase, but must complete identity verification before listing hardware.")
+                    </p>
+                </div>
+            </div>
+
+            @if (!user.IsVerified)
+            {
+                <button type="button"
+                        @onclick="HandleSimulateVerification"
+                        disabled="@_isVerifying"
+                        class="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-700 text-white text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 flex-shrink-0 cursor-pointer shadow-xs">
+                    @if (_isVerifying)
+                    {
+                        <svg class="animate-spin w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        <span>Verifying...</span>
+                    }
+                    else
+                    {
+                        <span>Verify Identity</span>
+                    }
+                </button>
+            }
+        </div>
+
+        <!-- Section 1: Profile Information -->
+        <div class="bg-white border border-zinc-200 rounded-md p-6 space-y-4">
+            <div class="border-b border-zinc-100 pb-3 flex items-center justify-between">
+                <div>
+                    <h2 class="text-sm font-semibold text-zinc-900">Personal Information</h2>
+                    <p class="text-[11px] text-zinc-500 font-mono">Your public name is shown to other traders during transactions.</p>
+                </div>
+                <span class="text-xs font-mono text-zinc-400">ID: @user.Id</span>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_profileFeedback))
+            {
+                <div class="p-3 text-xs font-mono rounded-md @(_isProfileError ? "bg-red-50 text-red-900 border border-red-200" : "bg-emerald-50 text-emerald-900 border border-emerald-200")">
+                    @_profileFeedback
+                </div>
+            }
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                    <label class="block font-medium text-zinc-700 mb-1">First Name *</label>
+                    <input type="text" @bind="_firstName" class="w-full bg-zinc-50 border border-zinc-300 rounded-md px-3 py-2 text-zinc-900 outline-none focus:border-zinc-900 focus:bg-white" />
+                </div>
+
+                <div>
+                    <label class="block font-medium text-zinc-700 mb-1">Last Name *</label>
+                    <input type="text" @bind="_lastName" class="w-full bg-zinc-50 border border-zinc-300 rounded-md px-3 py-2 text-zinc-900 outline-none focus:border-zinc-900 focus:bg-white" />
+                </div>
+
+                <div>
+                    <label class="block font-medium text-zinc-700 mb-1">Email Address (Read-only)</label>
+                    <input type="email" value="@user.Email" disabled class="w-full bg-zinc-100 border border-zinc-200 rounded-md px-3 py-2 text-zinc-500 font-mono cursor-not-allowed" />
+                </div>
+
+                <div>
+                    <label class="block font-medium text-zinc-700 mb-1">Metro Cebu Location / City *</label>
+                    <select @bind="_city" class="w-full bg-zinc-50 border border-zinc-300 rounded-md px-3 py-2 text-zinc-900 outline-none focus:border-zinc-900 focus:bg-white">
+                        <option value="Cebu City">Cebu City</option>
+                        <option value="Mandaue City">Mandaue City</option>
+                        <option value="Lapu-Lapu City">Lapu-Lapu City</option>
+                        <option value="Talisay City">Talisay City</option>
+                        <option value="Minglanilla">Minglanilla</option>
+                        <option value="Consolacion">Consolacion</option>
+                        <option value="Liloan">Liloan</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-zinc-100 flex justify-end">
+                <button type="button"
+                        @onclick="HandleSaveProfile"
+                        disabled="@_isSavingProfile"
+                        class="px-5 py-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-700 text-white text-xs font-semibold rounded-md transition-colors cursor-pointer shadow-xs">
+                    @(_isSavingProfile ? "Saving..." : "Save Profile Details")
+                </button>
+            </div>
+        </div>
+
+        <!-- Section 2: Change Password -->
+        <div class="bg-white border border-zinc-200 rounded-md p-6 space-y-4">
+            <div class="border-b border-zinc-100 pb-3">
+                <h2 class="text-sm font-semibold text-zinc-900">Security &amp; Password</h2>
+                <p class="text-[11px] text-zinc-500 font-mono">Ensure your account uses a strong, unique password with 8+ characters.</p>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_passwordFeedback))
+            {
+                <div class="p-3 text-xs font-mono rounded-md @(_isPasswordError ? "bg-red-50 text-red-900 border border-red-200" : "bg-emerald-50 text-emerald-900 border border-emerald-200")">
+                    @_passwordFeedback
+                </div>
+            }
+
+            <div class="space-y-3 text-xs max-w-md">
+                <div>
+                    <label class="block font-medium text-zinc-700 mb-1">Current Password *</label>
+                    <input type="password" @bind="_currentPassword" class="w-full bg-zinc-50 border border-zinc-300 rounded-md px-3 py-2 text-zinc-900 outline-none focus:border-zinc-900 focus:bg-white" />
+                </div>
+
+                <div>
+                    <label class="block font-medium text-zinc-700 mb-1">New Password *</label>
+                    <input type="password" @bind="_newPassword" class="w-full bg-zinc-50 border border-zinc-300 rounded-md px-3 py-2 text-zinc-900 outline-none focus:border-zinc-900 focus:bg-white" />
+                    <p class="text-[11px] text-zinc-400 mt-1">Must contain at least 8 characters with letters and numbers.</p>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-zinc-700 mb-1">Confirm New Password *</label>
+                    <input type="password" @bind="_confirmNewPassword" class="w-full bg-zinc-50 border border-zinc-300 rounded-md px-3 py-2 text-zinc-900 outline-none focus:border-zinc-900 focus:bg-white" />
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-zinc-100 flex justify-end">
+                <button type="button"
+                        @onclick="HandleChangePassword"
+                        disabled="@_isChangingPassword"
+                        class="px-5 py-2 bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-700 text-white text-xs font-semibold rounded-md transition-colors cursor-pointer shadow-xs">
+                    @(_isChangingPassword ? "Updating..." : "Update Password")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string _firstName = string.Empty;
+    private string _lastName = string.Empty;
+    private string _city = "Cebu City";
+
+    private string _currentPassword = string.Empty;
+    private string _newPassword = string.Empty;
+    private string _confirmNewPassword = string.Empty;
+
+    private bool _isSavingProfile = false;
+    private string? _profileFeedback;
+    private bool _isProfileError;
+
+    private bool _isChangingPassword = false;
+    private string? _passwordFeedback;
+    private bool _isPasswordError;
+
+    private bool _isVerifying = false;
+
+    protected override void OnInitialized()
+    {
+        if (CurrentUserService.CurrentUser != null)
+        {
+            _firstName = CurrentUserService.CurrentUser.FirstName;
+            _lastName = CurrentUserService.CurrentUser.LastName;
+            _city = CurrentUserService.CurrentUser.Location;
+        }
+    }
+
+    private async Task HandleSaveProfile()
+    {
+        _profileFeedback = null;
+        _isProfileError = false;
+        _isSavingProfile = true;
+        StateHasChanged();
+
+        await Task.Delay(200);
+
+        var result = UserService.UpdateProfile(CurrentUserService.UserId, _firstName, _lastName, _city);
+        _isSavingProfile = false;
+
+        if (result.Success)
+        {
+            _profileFeedback = "Profile information updated successfully.";
+            ToastService.ShowSuccess("Profile information saved.", "Account Updated");
+        }
+        else
+        {
+            _isProfileError = true;
+            _profileFeedback = result.Error ?? "Failed to update profile.";
+            ToastService.ShowError(result.Error ?? "Failed to update profile.", "Update Failed");
+        }
+    }
+
+    private async Task HandleChangePassword()
+    {
+        _passwordFeedback = null;
+        _isPasswordError = false;
+
+        if (_newPassword != _confirmNewPassword)
+        {
+            _isPasswordError = true;
+            _passwordFeedback = "New passwords do not match.";
+            return;
+        }
+
+        _isChangingPassword = true;
+        StateHasChanged();
+
+        await Task.Delay(250);
+
+        var result = UserService.ChangePassword(CurrentUserService.UserId, _currentPassword, _newPassword);
+        _isChangingPassword = false;
+
+        if (result.Success)
+        {
+            _passwordFeedback = "Password changed successfully.";
+            _currentPassword = string.Empty;
+            _newPassword = string.Empty;
+            _confirmNewPassword = string.Empty;
+            ToastService.ShowSuccess("Password changed successfully.", "Security Updated");
+        }
+        else
+        {
+            _isPasswordError = true;
+            _passwordFeedback = result.Error ?? "Failed to change password.";
+            ToastService.ShowError(result.Error ?? "Failed to change password.", "Password Error");
+        }
+    }
+
+    private async Task HandleSimulateVerification()
+    {
+        _isVerifying = true;
+        StateHasChanged();
+
+        await Task.Delay(300);
+
+        var success = UserService.VerifyUser(CurrentUserService.UserId);
+        _isVerifying = false;
+
+        if (success)
+        {
+            ToastService.ShowSuccess("Identity verified successfully! You can now publish listings.", "Verification Complete");
+        }
+    }
+}

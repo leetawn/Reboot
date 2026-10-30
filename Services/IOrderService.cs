@@ -18,9 +18,17 @@ public interface IOrderService
     (bool Success, string Message) CheckAutoRelease(Guid orderId);
     void CheckAndExpireReservations();
 
+    // Meetup & Shipping Coordination
+    (bool Success, string Message) ProposeMeetup(Guid orderId, string userId, string location, string? time, string? notes);
+    (bool Success, string Message) ConfirmMeetup(Guid orderId, string userId);
+    (bool Success, string Message) UpdateShippingDetails(Guid orderId, string sellerId, string courierName, string trackingNumber);
+    (bool Success, string Message) AddOrderMessage(Guid orderId, string senderId, string message);
+    (bool Success, string Message) ClaimUnresponsiveSellerRefund(Guid orderId, string buyerId);
+
     // Fast-forward demo helpers
     (bool Success, string Message) SimulateExpireInspectionWindow(Guid orderId);
     (bool Success, string Message) SimulateExpireReservationWindow(Guid orderId);
+    (bool Success, string Message) SimulateExpireDispatchWindow(Guid orderId);
 
     // Reviews
     (bool Success, string Message, Review? Review) SubmitReview(Guid orderId, string reviewerId, int rating, string comment);

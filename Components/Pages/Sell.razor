@@ -42,7 +42,7 @@ else if (!CurrentUserService.IsVerified)
         </h3>
 
         <p class="text-xs text-zinc-600 leading-relaxed">
-            Unlike anonymous classified sites, Reboot requires seller identity verification to protect buyers and keep dispute rates low. Unverified users can browse and purchase items, but you must complete simulated ID verification before listing.
+            Unlike anonymous classified sites, Reboot requires seller identity verification to protect buyers and keep dispute rates low. Unverified users can browse and purchase items, but you must complete identity verification before listing.
         </p>
 
         <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-sm text-xs font-mono text-zinc-700">
@@ -63,7 +63,7 @@ else if (!CurrentUserService.IsVerified)
         else
         {
             <button type="button" @onclick="SimulateVerifyAccount" class="w-full py-2.5 px-4 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-sm transition-colors cursor-pointer shadow-xs">
-                Simulate ID Verification (Verify My Account)
+                Submit Identity Verification (Verify My Account)
             </button>
         }
     </div>
@@ -517,7 +517,7 @@ else
             UserService.VerifyUser(CurrentUserService.UserId);
             CurrentUserService.CurrentUser.IsVerified = true;
             _isSimulatingVerification = false;
-            ToastService.ShowSuccess("Identity verification simulated successfully! You can now publish listings.", "Account Verified");
+            ToastService.ShowSuccess("Identity verification submitted successfully! You can now publish listings.", "Account Verified");
             StateHasChanged();
         }
     }

@@ -65,6 +65,7 @@
 
 @code {
     private readonly List<ToastMessage> _toasts = new();
+    private bool _isDisposed = false;
 
     protected override void OnInitialized()
     {
@@ -74,8 +75,10 @@
 
     private void HandleShowToast(ToastMessage toast)
     {
+        if (_isDisposed) return;
         InvokeAsync(async () =>
         {
+            if (_isDisposed) return;
             _toasts.Add(toast);
             StateHasChanged();
 
@@ -83,15 +86,20 @@
             if (toast.DurationMs > 0)
             {
                 await Task.Delay(toast.DurationMs);
-                DismissToast(toast.Id);
+                if (!_isDisposed)
+                {
+                    DismissToast(toast.Id);
+                }
             }
         });
     }
 
     private void DismissToast(Guid id)
     {
+        if (_isDisposed) return;
         InvokeAsync(() =>
         {
+            if (_isDisposed) return;
             var item = _toasts.FirstOrDefault(t => t.Id == id);
             if (item != null)
             {
@@ -103,6 +111,7 @@
 
     public void Dispose()
     {
+        _isDisposed = true;
         ToastService.OnShow -= HandleShowToast;
         ToastService.OnDismiss -= DismissToast;
     }

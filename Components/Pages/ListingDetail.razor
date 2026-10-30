@@ -331,8 +331,17 @@ else
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-3 border-t border-zinc-200">
-                    <button type="button" @onclick="() => _isEditing = false" class="px-3 py-1.5 border border-zinc-200 text-xs rounded-sm">Cancel</button>
-                    <button type="button" @onclick="SaveEditedListing" class="px-3 py-1.5 bg-zinc-900 text-white text-xs rounded-sm">Save Changes</button>
+                    <button type="button" @onclick="() => _isEditing = false" disabled="@_isSaving" class="px-3 py-1.5 border border-zinc-200 text-xs rounded-sm">Cancel</button>
+                    <button type="button" @onclick="SaveEditedListing" disabled="@_isSaving" class="px-3 py-1.5 bg-zinc-900 text-white text-xs rounded-sm flex items-center gap-1.5">
+                        @if (_isSaving)
+                        {
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span>Save Changes</span>
+                        }
+                    </button>
                 </div>
             </div>
         </div>
@@ -521,11 +530,16 @@ else
         StateHasChanged();
     }
 
-    private void SaveEditedListing()
+    private async Task SaveEditedListing()
     {
         if (_listing != null)
         {
+            _isSaving = true;
+            StateHasChanged();
+            await Task.Delay(200);
+
             ListingService.UpdateListing(_listing);
+            _isSaving = false;
             _isEditing = false;
             _isError = false;
             _feedbackMessage = "Listing updated successfully.";

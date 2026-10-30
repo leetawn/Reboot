@@ -201,4 +201,53 @@ public class UserService : IUserService
             return (true, null);
         }
     }
+
+    public (bool Success, string? Error) UpdateProfile(string userId, string firstName, string lastName, string city)
+    {
+        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
+        {
+            return (false, "First and last name are required.");
+        }
+
+        lock (_dataStore.SyncRoot)
+        {
+            var user = _dataStore.Users.FirstOrDefault(u => u.Id == userId);
+            if (user == null) return (false, "User not found.");
+
+            user.FirstName = firstName.Trim();
+            user.LastName = lastName.Trim();
+            user.DisplayName = $"{user.FirstName} {user.LastName[..1].ToUpperInvariant()}.";
+            user.Location = string.IsNullOrWhiteSpace(city) ? "Cebu City" : city.Trim();
+
+            return (true, null);
+        }
+    }
+
+    public (bool Success, string? Error) ChangePassword(string userId, string currentPassword, string newPassword)
+    {
+        if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+        {
+            return (false, "Please fill in all password fields.");
+        }
+
+        var (isValid, err) = PasswordHasher.ValidatePasswordComplexity(newPassword);
+        if (!isValid)
+        {
+            return (false, err);
+        }
+
+        lock (_dataStore.SyncRoot)
+        {
+            var user = _dataStore.Users.FirstOrDefault(u => u.Id == userId);
+            if (user == null) return (false, "User not found.");
+
+            if (!PasswordHasher.VerifyPassword(currentPassword, user.PasswordHash))
+            {
+                return (false, "Current password is incorrect.");
+            }
+
+            user.PasswordHash = PasswordHasher.HashPassword(newPassword);
+            return (true, null);
+        }
+    }
 }

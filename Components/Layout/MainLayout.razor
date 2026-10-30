@@ -89,7 +89,10 @@
                                         My Listings
                                     </a>
                                     <a href="/seller/@user.Id" @onclick="CloseUserMenu" class="block px-3 py-1.5 text-zinc-700 hover:bg-zinc-50">
-                                        Account
+                                        Public Profile
+                                    </a>
+                                    <a href="/account" @onclick="CloseUserMenu" class="block px-3 py-1.5 text-zinc-700 hover:bg-zinc-50">
+                                        Account Settings
                                     </a>
                                     @if (user.IsAdmin)
                                     {
@@ -162,14 +165,17 @@
                 <a href="/" class="text-sm font-semibold text-zinc-900 hover:text-zinc-600 transition-colors">
                     @AppConfig.AppName
                 </a>
+                <p class="text-xs text-zinc-500 mt-1">
+                    Escrow-protected peer-to-peer enthusiast gaming marketplace.
+                </p>
+                <div class="text-[11px] text-zinc-400 mt-0.5">
+                    © @DateTime.UtcNow.Year @AppConfig.AppName. All rights reserved.
+                </div>
             </div>
 
             <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-500">
-                <a href="/browse" class="hover:text-zinc-900 transition-colors">Browse</a>
-                <a href="/sell" class="hover:text-zinc-900 transition-colors">Sell Gear</a>
-                <a href="/terms" class="hover:text-zinc-900 transition-colors">Terms</a>
-                <a href="/privacy" class="hover:text-zinc-900 transition-colors">Privacy</a>
-                <span class="text-zinc-400">Metro Cebu, Philippines</span>
+                <a href="/terms" class="hover:text-zinc-900 transition-colors">Terms of Service</a>
+                <a href="/privacy" class="hover:text-zinc-900 transition-colors">Privacy Policy</a>
             </div>
         </div>
     </footer>

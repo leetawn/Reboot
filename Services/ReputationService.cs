@@ -25,12 +25,12 @@ public class ReputationService : IReputationService
 
             int completedSalesCount = completedOrders.Count;
 
-            // 2. Dispute count
+            // 2. Dispute count (legitimate disputes upheld against seller or pending review)
             var disputes = _dataStore.Disputes
                 .Where(d =>
                 {
                     var order = _dataStore.Orders.FirstOrDefault(o => o.Id == d.OrderId);
-                    return order != null && order.SellerId == sellerId;
+                    return order != null && order.SellerId == sellerId && d.Status != DisputeStatus.ResolvedRelease;
                 })
                 .ToList();
 

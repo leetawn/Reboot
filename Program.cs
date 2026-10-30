@@ -120,20 +120,25 @@ app.MapPost("/auth/register", async (HttpContext context, IUserService userServi
     var confirmPassword = form["confirmPassword"].ToString();
     var terms = form["termsAccepted"].ToString();
 
+    string MakeErrorRedirect(string errorMsg)
+    {
+        return $"/register?error={Uri.EscapeDataString(errorMsg)}&firstName={Uri.EscapeDataString(firstName)}&lastName={Uri.EscapeDataString(lastName)}&email={Uri.EscapeDataString(email)}&city={Uri.EscapeDataString(city)}";
+    }
+
     if (terms != "on" && terms != "true")
     {
-        return Results.Redirect($"/register?error={Uri.EscapeDataString("You must agree to the Terms of Service and Privacy Policy.")}");
+        return Results.Redirect(MakeErrorRedirect("You must agree to the Terms of Service and Privacy Policy."));
     }
 
     if (password != confirmPassword)
     {
-        return Results.Redirect($"/register?error={Uri.EscapeDataString("Passwords do not match.")}");
+        return Results.Redirect(MakeErrorRedirect("Passwords do not match."));
     }
 
     var result = userService.RegisterUser(firstName, lastName, email, city, password);
     if (!result.Success)
     {
-        return Results.Redirect($"/register?error={Uri.EscapeDataString(result.Error ?? "Registration failed.")}");
+        return Results.Redirect(MakeErrorRedirect(result.Error ?? "Registration failed."));
     }
 
     var user = result.User!;
