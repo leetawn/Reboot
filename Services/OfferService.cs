@@ -102,6 +102,7 @@ public class OfferService : IOfferService
             };
 
             _dataStore.Offers.Add(offer);
+            _dataStore.SaveChanges();
             return (true, "Offer submitted to seller.", offer);
         }
     }
@@ -152,6 +153,7 @@ public class OfferService : IOfferService
                 otherOffer.Status = OfferStatus.Expired;
             }
 
+            _dataStore.SaveChanges();
             return (true, "Offer accepted. Item is now reserved for the buyer.", order);
         }
     }
@@ -173,6 +175,7 @@ public class OfferService : IOfferService
             }
 
             offer.Status = OfferStatus.Declined;
+            _dataStore.SaveChanges();
             return (true, "Offer declined.");
         }
     }

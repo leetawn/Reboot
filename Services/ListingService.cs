@@ -15,6 +15,7 @@ public class ListingService : IListingService
     {
         lock (_dataStore.SyncRoot)
         {
+            _dataStore.EnsureFreshData();
             var query = _dataStore.Listings
                 .Where(l => l.Status == ListingStatus.Active)
                 .AsEnumerable();
@@ -94,6 +95,7 @@ public class ListingService : IListingService
     {
         lock (_dataStore.SyncRoot)
         {
+            _dataStore.EnsureFreshData();
             return _dataStore.Listings
                 .Where(l => l.SellerId == sellerId)
                 .OrderByDescending(l => l.CreatedDate)
@@ -105,6 +107,7 @@ public class ListingService : IListingService
     {
         lock (_dataStore.SyncRoot)
         {
+            _dataStore.EnsureFreshData();
             return _dataStore.Listings
                 .OrderByDescending(l => l.CreatedDate)
                 .ToList();
@@ -115,6 +118,7 @@ public class ListingService : IListingService
     {
         lock (_dataStore.SyncRoot)
         {
+            _dataStore.EnsureFreshData();
             return _dataStore.Listings.FirstOrDefault(l => l.Id == id);
         }
     }
@@ -132,6 +136,7 @@ public class ListingService : IListingService
                 listing.Photos.Add($"{listing.Category.ToString().ToLowerInvariant()}_default.jpg");
             }
             _dataStore.Listings.Add(listing);
+            _dataStore.SaveChanges();
             return listing;
         }
     }
@@ -154,6 +159,7 @@ public class ListingService : IListingService
             existing.SerialNumber = listing.SerialNumber;
             existing.WarrantyOffered = listing.WarrantyOffered;
             existing.MeetupOrShipping = listing.MeetupOrShipping;
+            _dataStore.SaveChanges();
             return true;
         }
     }
@@ -169,7 +175,8 @@ public class ListingService : IListingService
             bool isAuthorized = user?.IsAdmin == true || listing.SellerId == requestedByUserId;
             if (!isAuthorized) return false;
 
-            listing.Status = ListingStatus.Removed;
+            _dataStore.Listings.Remove(listing);
+            _dataStore.SaveChanges();
             return true;
         }
     }

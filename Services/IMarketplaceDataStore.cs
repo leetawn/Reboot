@@ -12,4 +12,7 @@ public interface IMarketplaceDataStore
     List<Review> Reviews { get; }
 
     object SyncRoot { get; }
+    void SaveChanges();
+    void Reload();
+    void EnsureFreshData();
 }

@@ -85,6 +85,7 @@ public class DisputeService : IDisputeService
             order.DisputedDate = DateTime.UtcNow;
 
             _dataStore.Disputes.Add(dispute);
+            _dataStore.SaveChanges();
 
             return (true, "Dispute opened. Escrow funds are frozen pending administrative review.", dispute);
         }
@@ -120,6 +121,7 @@ public class DisputeService : IDisputeService
                 listing.Status = ListingStatus.Active;
             }
 
+            _dataStore.SaveChanges();
             return (true, "Dispute resolved: Full refund returned to buyer. Listing returned to active.");
         }
     }
@@ -153,6 +155,7 @@ public class DisputeService : IDisputeService
                 listing.Status = ListingStatus.Sold;
             }
 
+            _dataStore.SaveChanges();
             return (true, "Dispute resolved: Funds released to seller.");
         }
     }
@@ -192,6 +195,7 @@ public class DisputeService : IDisputeService
                 listing.Status = ListingStatus.Sold;
             }
 
+            _dataStore.SaveChanges();
             return (true, $"Dispute resolved: Partial refund of {AppConfig.FormatPrice(partialRefundAmount)} released to buyer, remainder to seller.");
         }
     }

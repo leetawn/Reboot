@@ -117,6 +117,7 @@ public class OrderService : IOrderService
             };
 
             _dataStore.Orders.Add(order);
+            _dataStore.SaveChanges();
             return (true, "Item reserved. Payment must be confirmed within 24 hours.", order);
         }
     }
@@ -160,6 +161,7 @@ public class OrderService : IOrderService
                 IsSystem = true
             });
 
+            _dataStore.SaveChanges();
             return (true, "Payment secured in escrow. Seller has 72 hours to hand over or ship the item.");
         }
     }
@@ -187,6 +189,7 @@ public class OrderService : IOrderService
             order.HandedOverDate = now;
             order.InspectionDeadline = now.AddHours(48); // 48-hour inspection window
 
+            _dataStore.SaveChanges();
             return (true, "Hand-over recorded. Buyer has 48 hours to inspect the item against the condition checklist.");
         }
     }
@@ -224,7 +227,9 @@ public class OrderService : IOrderService
             {
                 listing.Status = ListingStatus.Sold;
             }
+            _dataStore.SaveChanges();
 
+            _dataStore.SaveChanges();
             return (true, "Item confirmed! Escrow funds have been successfully released to the seller.");
         }
     }
@@ -251,6 +256,7 @@ public class OrderService : IOrderService
                     listing.Status = ListingStatus.Sold;
                 }
 
+                _dataStore.SaveChanges();
                 return (true, "48-hour inspection window expired with no dispute. Funds automatically released to seller.");
             }
 
@@ -276,6 +282,7 @@ public class OrderService : IOrderService
             }
 
             CancelReservationInternal(order);
+            _dataStore.SaveChanges();
             return (true, "Reservation cancelled. Item is active again on the marketplace.");
         }
     }
@@ -386,6 +393,7 @@ public class OrderService : IOrderService
                 IsSystem = false
             });
 
+            _dataStore.SaveChanges();
             return (true, "Meetup details updated. Counterparty has been prompted to confirm.");
         }
     }
@@ -429,6 +437,7 @@ public class OrderService : IOrderService
                     Timestamp = DateTime.UtcNow,
                     IsSystem = true
                 });
+                _dataStore.SaveChanges();
                 return (true, $"Meetup location confirmed by both parties! Location: {order.MeetupLocation}.");
             }
             else
@@ -441,6 +450,7 @@ public class OrderService : IOrderService
                     Timestamp = DateTime.UtcNow,
                     IsSystem = false
                 });
+                _dataStore.SaveChanges();
                 return (true, "You confirmed the meetup spot. Awaiting counterparty confirmation.");
             }
         }
@@ -470,6 +480,7 @@ public class OrderService : IOrderService
                 IsSystem = false
             });
 
+            _dataStore.SaveChanges();
             return (true, "Courier tracking details saved.");
         }
     }
@@ -503,6 +514,7 @@ public class OrderService : IOrderService
                 IsSystem = false
             });
 
+            _dataStore.SaveChanges();
             return (true, "Message posted to order thread.");
         }
     }
@@ -550,6 +562,7 @@ public class OrderService : IOrderService
                 IsSystem = true
             });
 
+            _dataStore.SaveChanges();
             return (true, $"72-hour seller dispatch deadline expired. Order cancelled and full refund of {AppConfig.FormatPrice(order.Price)} returned to your account.");
         }
     }
@@ -607,6 +620,7 @@ public class OrderService : IOrderService
             };
 
             _dataStore.Reviews.Add(review);
+            _dataStore.SaveChanges();
             return (true, "Review submitted successfully.", review);
         }
     }
@@ -629,6 +643,7 @@ public class OrderService : IOrderService
         {
             listing.Status = ListingStatus.Active;
         }
+        _dataStore.SaveChanges();
     }
 
     private void CheckOrderDeadlines(Order order)
@@ -648,6 +663,7 @@ public class OrderService : IOrderService
             {
                 listing.Status = ListingStatus.Sold;
             }
+            _dataStore.SaveChanges();
         }
     }
 }

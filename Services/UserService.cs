@@ -17,6 +17,7 @@ public class UserService : IUserService
     {
         lock (_dataStore.SyncRoot)
         {
+            _dataStore.EnsureFreshData();
             return _dataStore.Users.ToList();
         }
     }
@@ -25,6 +26,7 @@ public class UserService : IUserService
     {
         lock (_dataStore.SyncRoot)
         {
+            _dataStore.EnsureFreshData();
             return _dataStore.Users.FirstOrDefault(u => u.Id == id);
         }
     }
@@ -34,6 +36,7 @@ public class UserService : IUserService
         if (string.IsNullOrWhiteSpace(email)) return null;
         lock (_dataStore.SyncRoot)
         {
+            _dataStore.EnsureFreshData();
             return _dataStore.Users.FirstOrDefault(u => u.Email.Equals(email.Trim(), StringComparison.OrdinalIgnoreCase));
         }
     }
@@ -68,14 +71,17 @@ public class UserService : IUserService
                 if (user.FailedLoginAttempts >= MaxFailedAttempts)
                 {
                     user.LockoutEnd = DateTime.UtcNow.Add(LockoutDuration);
+                    _dataStore.SaveChanges();
                     return (false, "Account is locked due to too many failed attempts. Try again in 15 minutes.", null);
                 }
+                _dataStore.SaveChanges();
                 return (false, "Incorrect email or password.", null);
             }
 
             // Reset failed attempts on success
             user.FailedLoginAttempts = 0;
             user.LockoutEnd = null;
+            _dataStore.SaveChanges();
             return (true, null, user);
         }
     }
@@ -125,6 +131,7 @@ public class UserService : IUserService
             };
 
             _dataStore.Users.Add(user);
+            _dataStore.SaveChanges();
             return (true, null, user);
         }
     }
@@ -137,6 +144,7 @@ public class UserService : IUserService
             if (user != null)
             {
                 user.IsVerified = true;
+                _dataStore.SaveChanges();
                 return true;
             }
             return false;
@@ -167,6 +175,7 @@ public class UserService : IUserService
             var token = Guid.NewGuid().ToString("N")[..12];
             user.PasswordResetToken = token;
             user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
+            _dataStore.SaveChanges();
             return (true, token);
         }
     }
@@ -197,6 +206,7 @@ public class UserService : IUserService
             user.PasswordResetTokenExpiry = null;
             user.FailedLoginAttempts = 0;
             user.LockoutEnd = null;
+            _dataStore.SaveChanges();
 
             return (true, null);
         }
@@ -218,6 +228,7 @@ public class UserService : IUserService
             user.LastName = lastName.Trim();
             user.DisplayName = $"{user.FirstName} {user.LastName[..1].ToUpperInvariant()}.";
             user.Location = string.IsNullOrWhiteSpace(city) ? "Cebu City" : city.Trim();
+            _dataStore.SaveChanges();
 
             return (true, null);
         }
@@ -247,6 +258,7 @@ public class UserService : IUserService
             }
 
             user.PasswordHash = PasswordHasher.HashPassword(newPassword);
+            _dataStore.SaveChanges();
             return (true, null);
         }
     }

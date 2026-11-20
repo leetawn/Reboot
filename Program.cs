@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
 using Reboot.Components;
+using Reboot.Data;
 using Reboot.Models;
 using Reboot.Services;
 
@@ -33,8 +35,20 @@ builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 
-// In-Memory Data Store (Singleton, realistic platform state)
-builder.Services.AddSingleton<IMarketplaceDataStore, InMemoryDataStore>();
+// Supabase Database Connection & EF Core
+var rawConnectionString = builder.Configuration.GetConnectionString("Supabase");
+var formattedConnectionString = ConnectionHelper.FormatPostgreSqlConnectionString(rawConnectionString);
+
+builder.Services.AddDbContextFactory<RebootDbContext>(options =>
+{
+    if (!string.IsNullOrWhiteSpace(formattedConnectionString))
+    {
+        options.UseNpgsql(formattedConnectionString);
+    }
+});
+
+// Marketplace Data Store (Supabase Postgres with In-Memory fallback)
+builder.Services.AddSingleton<IMarketplaceDataStore, PostgresDataStore>();
 
 // Current User Session (Scoped per connection, resolves from ClaimsPrincipal)
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
@@ -50,14 +64,16 @@ builder.Services.AddScoped<IToastService, ToastService>();
 
 var app = builder.Build();
 
+// Eagerly initialize marketplace data store (connects to Supabase / creates schema / seeds)
+_ = app.Services.GetRequiredService<IMarketplaceDataStore>();
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
-
-app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
